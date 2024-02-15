@@ -309,8 +309,6 @@ in {
   };
 
 #=> PROGRAMS <=#
-#= Dconf
-#  programs.dconf.enable = true;
 
 #= Firefox
   programs.firefox = {                  
