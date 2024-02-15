@@ -534,13 +534,13 @@ in {
     clamtk # Antivirus
     discord
     electron
+    unstable.fastfetch
     findutils
     git
     godot_4
     libportal
     libsForQt5.qt5ct
     libstdcxx5
-    neofetch
     networkmanager
     pipewire
     protonup-qt
