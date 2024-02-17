@@ -66,6 +66,7 @@ in {
   systemd.tmpfiles.rules = [
       "L+    /opt/rocm/hip   -    -    -     -    ${pkgs.rocmPackages.clr}"
       "L+    /usr/share/wayland-sessions/hyprland.desktop   -    -    -     -    ${pkgs.hyprland}/share/wayland-sessions/hyprland.desktop"
+      "D! /tmpfs 0777 root root -"
     ];
   systemd.extraConfig = ''
       [Process]
@@ -84,7 +85,6 @@ in {
       Priority=10
       Interactive=true
       NegativePriority=5
-      ...
       DefaultLimitNOFILE=524288
     '';
   systemd.user.extraConfig = ''
@@ -309,6 +309,8 @@ in {
   };
 
 #=> PROGRAMS <=#
+#= Dconf
+#  programs.dconf.enable = true;
 
 #= Firefox
   programs.firefox = {                  
@@ -346,12 +348,13 @@ in {
       "beacon.enabled" = false;
       "webgl.disabled" = false;
       "gfx.webrender.all" = true;
+      "browser.cache.disk.parent_directory" = "/tmpfs";
       "dom.event.clipboardevents.enabled" = false;
       "media.navigator.enabled" = false;
       "network.cookie.cookieBehavior" = 1;
     };
     languagePacks = [ "es-MX" ];
-    package = pkgs.firefox-unwrapped { };
+    package = (pkgs.wrapFirefox.override { libpulseaudio = pkgs.libpressureaudio; }) pkgs.firefox-unwrapped { };
   };
 
 #= Neovim
@@ -531,13 +534,13 @@ in {
     clamtk # Antivirus
     discord
     electron
-    unstable.fastfetch
     findutils
     git
     godot_4
     libportal
     libsForQt5.qt5ct
     libstdcxx5
+    neofetch
     networkmanager
     pipewire
     protonup-qt
@@ -997,6 +1000,12 @@ in {
   { device = "/dev/disk/by-uuid/5d5d4cdc-2a16-466a-aaf6-03bb93931d97";
     fsType = "ext4";
     options = [ "defaults" "noatime" "discard" "async" "data=writeback" "commit=60" ];
+  };
+
+  fileSystems."/tmpfs" = 
+  { device = "tmpfs";
+    fsType = "tmpfs";
+    options = [ "size=2048m" ];
   };
 
 #= Enable Trim Needed for SSD's
