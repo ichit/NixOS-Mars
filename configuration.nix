@@ -66,7 +66,6 @@ in {
   systemd.tmpfiles.rules = [
       "L+    /opt/rocm/hip   -    -    -     -    ${pkgs.rocmPackages.clr}"
       "L+    /usr/share/wayland-sessions/hyprland.desktop   -    -    -     -    ${pkgs.hyprland}/share/wayland-sessions/hyprland.desktop"
-      "D! /tmpfs 0777 root root -"
     ];
   systemd.extraConfig = ''
       [Process]
