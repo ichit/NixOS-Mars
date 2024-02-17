@@ -351,7 +351,7 @@ in {
       "network.cookie.cookieBehavior" = 1;
     };
     languagePacks = [ "es-MX" ];
-    package = (pkgs.wrapFirefox.override { libpulseaudio = pkgs.libpressureaudio; }) pkgs.firefox-unwrapped { };
+    package = pkgs.firefox-unwrapped { };
   };
 
 #= Neovim
