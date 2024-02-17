@@ -346,7 +346,6 @@ in {
       "beacon.enabled" = false;
       "webgl.disabled" = false;
       "gfx.webrender.all" = true;
-      "browser.cache.disk.parent_directory" = "/tmpfs";
       "dom.event.clipboardevents.enabled" = false;
       "media.navigator.enabled" = false;
       "network.cookie.cookieBehavior" = 1;
@@ -998,12 +997,6 @@ in {
   { device = "/dev/disk/by-uuid/5d5d4cdc-2a16-466a-aaf6-03bb93931d97";
     fsType = "ext4";
     options = [ "defaults" "noatime" "discard" "async" "data=writeback" "commit=60" ];
-  };
-
-  fileSystems."/tmpfs" = 
-  { device = "tmpfs";
-    fsType = "tmpfs";
-    options = [ "size=2048m" ];
   };
 
 #= Enable Trim Needed for SSD's
