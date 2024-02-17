@@ -84,6 +84,7 @@ in {
       Priority=10
       Interactive=true
       NegativePriority=5
+      ...
       DefaultLimitNOFILE=524288
     '';
   systemd.user.extraConfig = ''
