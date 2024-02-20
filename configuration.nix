@@ -993,7 +993,7 @@ in {
   fileSystems."/mnt/sdb1" =
   { device = "/dev/disk/by-uuid/5d5d4cdc-2a16-466a-aaf6-03bb93931d97";
     fsType = "ext4";
-    options = [ "defaults" "noatime" "discard" "async" "data=writeback" "commit=60" ];
+    options = [ "defaults" "async" "noatime" "nodiratime" "data=writeback" "barrier=1" ];
   };
 
 #= Enable Trim Needed for SSD's
