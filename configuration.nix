@@ -20,7 +20,7 @@ in {
   boot.loader.efi.canTouchEfiVariables = true;
   boot.plymouth.enable = true;
 #=> Kernel Config
-  boot.kernelPackages = pkgs.linuxPackages_latest; # Last Linux Kernel
+  boot.kernelPackages = unstable.pkgs.linuxPackages_zen; # Last Linux Kernel (Zen)
   boot.kernelParams = [
     "HDMI-A-1:1920x1080@60"
     "amdgpu.noretry=0"
@@ -46,6 +46,7 @@ in {
     "acpi_rev_override=5"
     "tsc=reliable"
     "clocksource=tsc"
+    "kcfi"
   ];
   boot.kernel.sysctl = {
     "vm.max_map_count" = 2147483642;  # A simple change Valve made on the Steam Deck...
@@ -66,7 +67,6 @@ in {
   systemd.tmpfiles.rules = [
       "L+    /opt/rocm/hip   -    -    -     -    ${pkgs.rocmPackages.clr}"
       "L+    /usr/share/wayland-sessions/hyprland.desktop   -    -    -     -    ${pkgs.hyprland}/share/wayland-sessions/hyprland.desktop"
-      "D! /tmpfs 0777 root root -"
     ];
   systemd.extraConfig = ''
       [Process]
@@ -85,6 +85,7 @@ in {
       Priority=10
       Interactive=true
       NegativePriority=5
+      ...
       DefaultLimitNOFILE=524288
     '';
   systemd.user.extraConfig = ''
@@ -190,7 +191,7 @@ in {
       "sshd"
       "input"
     ];
-    shell = pkgs.zsh;
+    shell = pkgs.fish; #pkgs.zsh;
     packages = with pkgs; [ ];
   };
 
@@ -250,7 +251,7 @@ in {
 #= SDDM
   services.xserver.displayManager.sddm.enable = true;
   services.xserver.displayManager.sddm.wayland.enable = true;
-  services.xserver.displayManager.sddm.theme = "chili";
+  services.xserver.displayManager.sddm.theme = "Elegant";
 
 #= X.ORG/X11
   services.xserver = {
@@ -304,13 +305,11 @@ in {
     alsa.support32Bit = true;
     pulse.enable = true;
     jack.enable = true;
-    #wireplumber.enable = true;
+    wireplumber.enable = true;
     socketActivation = true;
   };
 
 #=> PROGRAMS <=#
-#= Dconf
-#  programs.dconf.enable = true;
 
 #= Firefox
   programs.firefox = {                  
@@ -348,21 +347,24 @@ in {
       "beacon.enabled" = false;
       "webgl.disabled" = false;
       "gfx.webrender.all" = true;
-      "browser.cache.disk.parent_directory" = "/tmpfs";
       "dom.event.clipboardevents.enabled" = false;
       "media.navigator.enabled" = false;
       "network.cookie.cookieBehavior" = 1;
     };
     languagePacks = [ "es-MX" ];
-    package = (pkgs.wrapFirefox.override { libpulseaudio = pkgs.libpressureaudio; }) pkgs.firefox-unwrapped { };
+    package = pkgs.firefox;
   };
 
 #= Neovim
   programs.neovim = {
     enable = true;
+    package = unstable.pkgs.neovim-unwrapped;
     viAlias = true;
     vimAlias = true;
     configure = {
+      customRC = ''
+        set number
+      '';
       packages.myVimPlugins = with pkgs.vimPlugins; {
         start = [
           vim-lastplace 
@@ -379,6 +381,16 @@ in {
 
 #= Java
   programs.java.enable = true;
+
+#=> Shell's
+#= Fish
+  programs.fish.enable = true;
+  programs.fish.useBabelfish = true;
+  programs.fish.vendor.config.enable = true;
+  programs.fish.vendor.completions.enable = true;
+  programs.fish.vendor.functions.enable = true;
+  programs.nix-index.enableFishIntegration = true;
+
 #= Zsh/OhMyZsh
   programs.zsh.enable = true;
   programs.zsh.autosuggestions.enable = true;
@@ -387,6 +399,7 @@ in {
     enable = true;
     theme = "robbyrussell";   
   };
+
 #= XWayland
   programs.xwayland.enable = true;
 
@@ -454,13 +467,9 @@ in {
       warn-dirty = true;
       auto-optimise-store = true;
       experimental-features = [ "nix-command" "flakes" ];
+      trusted-users = ["rick"];
     };
   };
-
-#= PrismLauncher fetchTarball
-  nixpkgs.overlays = [
-    (import (builtins.fetchTarball "https://github.com/PrismLauncher/PrismLauncher/archive/develop.tar.gz")).overlays.default
-  ];
 
 #= Allow unfree packages
   nixpkgs.config.allowUnfree = true;
@@ -502,9 +511,6 @@ in {
 #= Polkit
     libsForQt5.polkit-kde-agent
 #= Filemanagers
-    #(ranger.override { 
-    #  imagePreviewSupport = true;
-    #})
     pcmanfm
     # Image Viewer
     imv
@@ -513,17 +519,11 @@ in {
     qgnomeplatform-qt6
     qgnomeplatform
     sddm-chili-theme # SDDM
+    unstable.elegant-sddm
     # XWayland/Wayland
     unstable.glfw-wayland
     unstable.xwayland
     unstable.xwaylandvideobridge
-# Pruebas
-    tdb
-    tntdb
-    smbmap
-    #kvm
-    #bfq-sched
-    #linuxPackages.libre.fsync
 #= Main
     alsa-plugins
     alsa-utils
@@ -532,15 +532,14 @@ in {
     asciiquarium-transparent
     ark
     clamtk # Antivirus
-    discord
+    webcord # discord client
     electron
     findutils
-    git
     godot_4
     libportal
     libsForQt5.qt5ct
     libstdcxx5
-    neofetch
+    unstable.fastfetch
     networkmanager
     pipewire
     protonup-qt
@@ -553,6 +552,12 @@ in {
     xboxdrv # Xbox Gamepad Driver
     #xclip
     yarn
+#= Shell Utilities
+    babelfish
+    bat 
+    eza
+    git
+    starship
 #= XDG
     xdg-launch
     xdg-user-dirs
@@ -772,18 +777,6 @@ in {
 
 ##==> GAMING <==##
 
-#=> Extra cache, needed for Gaming and other things...
-  nix.settings = {
-    substituters = [
-        "https://nix-gaming.cachix.org"
-        "https://hyprland.cachix.org"
-    ];
-      trusted-public-keys = [
-        "nix-gaming.cachix.org-1:nbjlureqMbRAxR1gJ/f3hxemL9svXaZF/Ees8vCUUs4="
-        "hyprland.cachix.org-1:a7pgxzMz7+chwVL3/pzj6jIBMioiJM7ypFP8PwtkuGc="
-    ];
-  };
-
 #=> Gamescope
   programs.gamescope = {
     enable = true;
@@ -823,6 +816,7 @@ in {
         gtkmm4
         libgdiplus
         libxkbcommon
+        openal
         xwayland
         steamPackages.steam-runtime-wrapped
         # steamwebhelper
@@ -900,7 +894,7 @@ in {
         jack.periods = 2
       '';
     };
-    pathsToLink = [ "/share/X11" ]; # "/share/nix-ld"  
+    pathsToLink = [ "/share/X11" "/libexec" "/share/zsh" ]; # "/share/nix-ld"  
     sessionVariables = rec {
 #=> Default's
       EDITOR = "nvim";
@@ -1000,12 +994,6 @@ in {
   { device = "/dev/disk/by-uuid/5d5d4cdc-2a16-466a-aaf6-03bb93931d97";
     fsType = "ext4";
     options = [ "defaults" "noatime" "discard" "async" "data=writeback" "commit=60" ];
-  };
-
-  fileSystems."/tmpfs" = 
-  { device = "tmpfs";
-    fsType = "tmpfs";
-    options = [ "size=2048m" ];
   };
 
 #= Enable Trim Needed for SSD's
