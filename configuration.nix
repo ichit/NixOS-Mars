@@ -19,8 +19,8 @@ in {
   boot.loader.systemd-boot.enable = true;
   boot.loader.efi.canTouchEfiVariables = true;
   boot.plymouth.enable = true;
-#=> Kernel Config
-  boot.kernelPackages = unstable.pkgs.linuxPackages_zen; # Last Linux Kernel (Zen)
+#=> Kernel
+  boot.kernelPackages = unstable.pkgs.linuxPackages_latest; # Last Linux Kernel
   boot.kernelParams = [
     "HDMI-A-1:1920x1080@60"
     "amdgpu.noretry=0"
@@ -48,6 +48,7 @@ in {
     "clocksource=tsc"
     "kcfi"
   ];
+
   boot.kernel.sysctl = {
     "vm.max_map_count" = 2147483642;  # A simple change Valve made on the Steam Deck...
     "vm.swappiness" = 10;  # Reduce swappiness since RAM's faster.
@@ -56,6 +57,7 @@ in {
     "vm.zone_reclaim_mode" = 0;
     "vm.page_lock_unfairness" = 1;
   };
+
   boot.tmp.cleanOnBoot = true;
   boot.extraModprobeConfig = "options kvm_amd nested=1"; # AMD
   boot.supportedFilesystems = [ "ntfs" ];
@@ -68,6 +70,7 @@ in {
       "L+    /opt/rocm/hip   -    -    -     -    ${pkgs.rocmPackages.clr}"
       "L+    /usr/share/wayland-sessions/hyprland.desktop   -    -    -     -    ${pkgs.hyprland}/share/wayland-sessions/hyprland.desktop"
     ];
+
   systemd.extraConfig = ''
       [Process]
       Name=bit.trip.runner
@@ -86,8 +89,11 @@ in {
       Interactive=true
       NegativePriority=5
       ...
+      DefaultTimeoutStopSec=10s
+      ...
       DefaultLimitNOFILE=524288
     '';
+
   systemd.user.extraConfig = ''
       DefaultLimitNOFILE=524288
     '';
@@ -294,9 +300,8 @@ in {
   services.devmon.enable = true;
 
 #= Pipewire
-  # Enable sound with pipewire.
+
   sound.enable = true;
-  hardware.pulseaudio.enable = false;
   security.rtkit.enable = true; # Real-Time Priority to Processes.
   services.pipewire = {
     enable = true;
@@ -363,10 +368,32 @@ in {
     vimAlias = true;
     configure = {
       customRC = ''
+        syntax on
+        set ignorecase
+        set smartcase
+        set encoding=utf-8
+        set number relativenumber
+
+        " Autocompletion
+        set wildmode=longest,list,full
+
+        " Use system Clipboard
+        set clipboard+=unnamedplus
+
+        " Lines Number
         set number
+
+        " Tab Settings
+        set expandtab
+        set shiftwidth=4
+        set softtabstop=4
+        set tabstop=4
+
+        set path=.,,**
       '';
       packages.myVimPlugins = with pkgs.vimPlugins; {
         start = [
+          indentLine
           vim-lastplace 
           vim-nix
           vim-plug
@@ -391,14 +418,31 @@ in {
   programs.fish.vendor.functions.enable = true;
   programs.nix-index.enableFishIntegration = true;
 
-#= Zsh/OhMyZsh
-  programs.zsh.enable = true;
-  programs.zsh.autosuggestions.enable = true;
-  programs.zsh.syntaxHighlighting.enable = true;
-  programs.zsh.ohMyZsh = {
-    enable = true;
-    theme = "robbyrussell";   
-  };
+#= Starship
+  programs.starship.enable = true;
+  programs.starship.settings = {
+    add_newline = true;
+
+    character = {
+        success_symbol = "[<0> ~](bold green)";
+        error_symbol = "[<0> ~](bold red)";
+    };
+
+    shell = {
+        disabled = false;
+        format = "$indicator";
+        fish_indicator = "(bright-white) ";
+        bash_indicator = "(bright-white) ";
+    };
+
+    nix_shell = {
+      symbol = "";
+      format = "[$symbol$name]($style) ";
+      style = "bright-purple bold";
+    };
+
+    package.disabled = true;
+    };
 
 #= XWayland
   programs.xwayland.enable = true;
@@ -409,7 +453,7 @@ in {
     portalPackage = pkgs.xdg-desktop-portal-hyprland;
     enableNvidiaPatches = false; # false if you use a AMD GPU
     xwayland.enable = true;
-    package = pkgs.hyprland;
+    package = unstable.pkgs.hyprland;
   };
 #= Top Bar
   programs.waybar = {
@@ -555,9 +599,8 @@ in {
 #= Shell Utilities
     babelfish
     bat 
-    eza
+    unstable.eza
     git
-    starship
 #= XDG
     xdg-launch
     xdg-user-dirs
@@ -752,11 +795,9 @@ in {
     ryujinx
 #= The best Game in the World
     superTuxKart
-#= Cartridges
-    cartridges
 #= Heroic GOG/Epic/Amazon Game Launcher
-    heroic
-    gogdl
+    unstable.heroic
+    unstable.gogdl
 #= Steam
     winetricks
     protontricks
@@ -780,6 +821,7 @@ in {
 #=> Gamescope
   programs.gamescope = {
     enable = true;
+    package = pkgs.gamescope;
     capSysNice = false;
   };
 
@@ -854,7 +896,7 @@ in {
   hardware.opengl.driSupport32Bit = true;
   hardware.opengl.extraPackages = with pkgs; [
     amdvlk
-    libdrm
+    unstable.libdrm
     mesa.drivers
     mesa.llvmPackages.llvm.lib
     rocmPackages.clr
@@ -1079,10 +1121,10 @@ in {
   # Before changing this value read the documentation for this option
   # (e.g. man configuration.nix or on https://nixos.org/nixos/options.html).
   system.stateVersion = "23.11"; # Did you read the comment?
-  system.copySystemConfiguration = true;
-  system.autoUpgrade.enable = true;
-  system.autoUpgrade.allowReboot = false;
-  system.autoUpgrade.channel = "https://nixos.org/channels/nixos-23.11";
+  #system.copySystemConfiguration = true;
+  #system.autoUpgrade.enable = true;
+  #system.autoUpgrade.allowReboot = false;
+  #system.autoUpgrade.channel = "https://nixos.org/channels/nixos-23.11";
 
   documentation.nixos.enable = true;
 }
