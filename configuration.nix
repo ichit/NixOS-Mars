@@ -8,6 +8,10 @@
 
   unstable = import (builtins.fetchTarball https://github.com/nixos/nixpkgs/tarball/nixos-unstable) { config = config.nixpkgs.config; };
 
+  flake-compat = builtins.fetchTarball "https://github.com/edolstra/flake-compat/archive/master.tar.gz";
+
+  hyprland-flake = (import flake-compat { src = builtins.fetchTarball "https://github.com/hyprwm/Hyprland/archive/master.tar.gz"; }).defaultNix;
+
 in {
   imports =
     [ # Include the results of the hardware scan.
@@ -20,7 +24,7 @@ in {
   boot.loader.efi.canTouchEfiVariables = true;
   boot.plymouth.enable = true;
 #=> Kernel
-  boot.kernelPackages = unstable.pkgs.linuxPackages_latest; # Last Linux Kernel
+  boot.kernelPackages = unstable.pkgs.linuxPackages_zen; # Latest Kernel (ZEN).
   boot.kernelParams = [
     "HDMI-A-1:1920x1080@60"
     "amdgpu.noretry=0"
@@ -38,7 +42,6 @@ in {
     "ksm=1"
     "mitigations=auto"
     "sched_mc_power_savings=0"
-    "security=apparmor"
     "nohibernate"
     "quiet"
     "nosplash"
@@ -65,7 +68,8 @@ in {
   boot.blacklistedKernelModules = [ "k10temp" ];
   boot.extraModulePackages = [ config.boot.kernelPackages.zenpower ];
 
-  # SystemD
+#==> SystemD <==#
+
   systemd.tmpfiles.rules = [
       "L+    /opt/rocm/hip   -    -    -     -    ${pkgs.rocmPackages.clr}"
       "L+    /usr/share/wayland-sessions/hyprland.desktop   -    -    -     -    ${pkgs.hyprland}/share/wayland-sessions/hyprland.desktop"
@@ -97,23 +101,6 @@ in {
   systemd.user.extraConfig = ''
       DefaultLimitNOFILE=524288
     '';
-
-#=> Polkit
-  security.polkit.enable = true;
-
-  systemd.services.polkit-kde-authentication-agent-1 = {
-    description =  "polkit-kde-authentication-agent-1";
-    wantedBy = [ "graphical-session.target" ];
-    wants = [ "graphical-session.target" ];
-    after = [ "graphical-session.target" ];
-    serviceConfig = {
-      Type =  "simple" ;
-      ExecStart = "${pkgs.libsForQt5.polkit-kde-agent}/libexec/polkit-kde-authentication-agent-1";
-      Restart =  "on-failure" ;
-      RestartSec = 1;
-      TimeoutStopSec = 10;
-    };
-  };
 
 #==> User and Home Manager <==#
   home-manager.useUserPackages = true;
@@ -194,7 +181,6 @@ in {
       "networkmanager"
       "kvm"
       "qemu"
-      "sshd"
       "input"
     ];
     shell = pkgs.fish; #pkgs.zsh;
@@ -205,7 +191,6 @@ in {
   fonts = {
     packages = with pkgs; [
       montserrat
-      nerdfonts
       noto-fonts
       noto-fonts-cjk
       noto-fonts-emoji
@@ -290,14 +275,16 @@ in {
   services.dbus = {
     enable = true;
     apparmor = "enabled";
-    packages = with pkgs; [ flatpak ];
+    implementation = "broker"; 
+    packages = with pkgs; [ flatpak gcr gnome.gnome-settings-daemon ];
   };
 
-# PCManFM
+# Nautilus
   services.gvfs.enable = true;
   services.gvfs.package = pkgs.gnome.gvfs;
   services.udisks2.enable = true;
   services.devmon.enable = true;
+  services.gnome.gnome-settings-daemon.enable = true;
 
 #= Pipewire
 
@@ -312,6 +299,7 @@ in {
     jack.enable = true;
     wireplumber.enable = true;
     socketActivation = true;
+    package = pkgs.pipewire;
   };
 
 #=> PROGRAMS <=#
@@ -357,15 +345,17 @@ in {
       "network.cookie.cookieBehavior" = 1;
     };
     languagePacks = [ "es-MX" ];
-    package = pkgs.firefox;
+    package = pkgs.floorp;
   };
 
 #= Neovim
   programs.neovim = {
     enable = true;
-    package = unstable.pkgs.neovim-unwrapped;
+    defaultEditor = true;
     viAlias = true;
     vimAlias = true;
+    withPython3 = true;
+    package = unstable.pkgs.neovim-unwrapped;
     configure = {
       customRC = ''
         syntax on
@@ -407,15 +397,34 @@ in {
   };
 
 #= Java
-  programs.java.enable = true;
+  programs.java = {
+    enable = true;
+    package = pkgs.jdk;
+    binfmt = true;
+  };
 
 #=> Shell's
+
 #= Fish
-  programs.fish.enable = true;
-  programs.fish.useBabelfish = true;
-  programs.fish.vendor.config.enable = true;
-  programs.fish.vendor.completions.enable = true;
-  programs.fish.vendor.functions.enable = true;
+
+  programs.fish = {
+    enable = true;
+    useBabelfish = true;
+    promptInit = "set fish_greeting";
+    shellAliases = {
+      grep = "grep --color=auto";
+      cat = "bat --style=plain --paging=never";
+      ls = "eza --all --group-directories-first --grid --icons";
+      tree = "eza -T --all --icons";
+      ll = "eza -l --all --octal-permissions --icons";
+    };
+    interactiveShellInit = "fastfetch";
+    vendor = {
+      config.enable = true;
+      completions.enable = true;
+      functions.enable = true;
+    };
+  };
   programs.nix-index.enableFishIntegration = true;
 
 #= Starship
@@ -448,12 +457,14 @@ in {
   programs.xwayland.enable = true;
 
 #==>~HYPRLAND~<==#
+
   programs.hyprland = {
     enable = true;
-    portalPackage = pkgs.xdg-desktop-portal-hyprland;
+    portalPackage = unstable.pkgs.xdg-desktop-portal-hyprland;
     enableNvidiaPatches = false; # false if you use a AMD GPU
     xwayland.enable = true;
-    package = unstable.pkgs.hyprland;
+    #package = pkgs.hyprland;
+    package = hyprland-flake.packages.${pkgs.system}.hyprland;
   };
 #= Top Bar
   programs.waybar = {
@@ -462,11 +473,15 @@ in {
       mesonFlags = oldAttrs.mesonFlags ++ [ "-Dexperimental=true" ];
     });
   };
-#= File Manager
+
+#= File Managers
+  # Yazi
   programs.yazi = {
     enable = true;
     package = unstable.pkgs.yazi;
   };
+  # Nautilus
+  services.gnome.sushi.enable = true;
 
 #= Enable xdg desktop Integration
   xdg = {
@@ -479,6 +494,13 @@ in {
         libsForQt5.xdg-desktop-portal-kde
         lxqt.xdg-desktop-portal-lxqt
       ];
+      config = {
+        common = {
+          default = [ "xdph" "gtk" ];
+          "org.freedesktop.impl.portal.Secret" = [ "gnome-keyring" ];
+          "org.freedesktop.portal.FileChooser" = [ "xdg-desktop-portal-gtk" ];
+        };
+      };
     };
     sounds.enable = true;
     autostart.enable = true;
@@ -518,6 +540,9 @@ in {
 #= Allow unfree packages
   nixpkgs.config.allowUnfree = true;
 
+#= Prismlauncher fetchTarball
+  #nixpkgs.overlays = [(import (builtins.fetchTarball "https://github.com/PrismLauncher/PrismLauncher/archive/develop.tar.gz")).overlays.default];
+
 #=> Packages Installed in System Profile.
   environment.systemPackages = with pkgs; [
     #=> Hyprland
@@ -528,8 +553,10 @@ in {
     #waybar-mpris
     # Main
     #hyprland
-    hyprland-protocols
-    wayland-utils
+    unstable.hyprland-protocols
+    unstable.hyprland-per-window-layout
+    unstable.hyprland-autoname-workspaces
+    unstable.wayland-utils
     # Wayland - Kiosk. Used for login_managers
     cage
     # Notification Deamon
@@ -553,9 +580,10 @@ in {
     unstable.slurp # Selcting
     swappy # Editing
 #= Polkit
+    polkit
     libsForQt5.polkit-kde-agent
 #= Filemanagers
-    pcmanfm
+    gnome.nautilus
     # Image Viewer
     imv
     # Theme's
@@ -573,7 +601,6 @@ in {
     alsa-utils
     android-tools
     android-udev-rules
-    asciiquarium-transparent
     ark
     clamtk # Antivirus
     webcord # discord client
@@ -583,24 +610,26 @@ in {
     libportal
     libsForQt5.qt5ct
     libstdcxx5
+    unstable.linuxHeaders
     unstable.fastfetch
-    networkmanager
     pipewire
     protonup-qt
+    python3
     qt5.qtwayland
     qt6.qtwayland
-    telegram-desktop
     usbutils
     wget
-    wpsoffice # Office Suite
+    libreoffice # Office Suite
     xboxdrv # Xbox Gamepad Driver
     #xclip
     yarn
-#= Shell Utilities
+#= Cli Utilities
     babelfish
-    bat 
+    bat
+    dunst
     unstable.eza
     git
+    skim
 #= XDG
     xdg-launch
     xdg-user-dirs
@@ -623,6 +652,9 @@ in {
     stdenv.cc.cc
 #= Godot Engine
     libunwind
+#= Rust
+    cargo # PM for rust
+    rustup # Rust toolchain installer
 #= Drives utilities
     gnome.gnome-disk-utility # Disk Manager
     etcher # Flash OS images for Linux and another...
@@ -659,6 +691,8 @@ in {
     carla # An audio plugin host
     gxplugins-lv2 # A set of extra lv2 plugins from the guitarix project
     olive-editor # Professional open-source NLE video editor
+    giada # Your hardcore loop machine.
+    ardour # Multi-track hard disk recording software
     audacity
     (wrapOBS {
       plugins = with obs-studio-plugins; [ 
@@ -719,17 +753,16 @@ in {
     mpv
 #= AMD P-STATE EPP
     amdctl
-#= Vulkan and Mesa.
-    mesa
-    vulkan-headers
-    vulkan-loader
-    vulkan-tools
-    vulkan-tools-lunarg
-    vulkan-validation-layers
-    vulkan-extension-layer
-    vkdisplayinfo
-    vkd3d-proton
-    vk-bootstrap
+#= Vulkan
+    unstable.vulkan-headers
+    unstable.vulkan-loader
+    unstable.vulkan-tools
+    unstable.vulkan-tools-lunarg
+    unstable.vulkan-validation-layers
+    unstable.vulkan-extension-layer
+    unstable.vkdisplayinfo
+    unstable.vkd3d-proton
+    unstable.vk-bootstrap
 #= ROCm
     rocmPackages.rocm-core
     rocmPackages.rocm-runtime 
@@ -737,12 +770,6 @@ in {
     rocmPackages.rocm-smi # Managment interface
     rocmPackages.rocminfo # ROCm app for reporting System info
     rocmPackages.rocm-device-libs
-#= Shaderc.
-    shaderc
-    shaderc.bin
-    shaderc.static
-    shaderc.dev
-    shaderc.lib
 #= Administrative/GUI.
     corectrl # Let's you overclock/etc. Requires Polkit authentication!
 #= PC monitoring
@@ -790,9 +817,8 @@ in {
     # Xbox
     xemu
     # Nintendo
-    dolphin-emu # Gamecube/Wii/Triforce
-    yuzu-early-access # Switch
-    ryujinx
+    unstable.dolphin-emu # Gamecube/Wii/Triforce
+    unstable.ryujinx # Switch
 #= The best Game in the World
     superTuxKart
 #= Heroic GOG/Epic/Amazon Game Launcher
@@ -801,14 +827,12 @@ in {
 #= Steam
     winetricks
     protontricks
-    steam-run
     steamtinkerlaunch
 #= Lutris
-    lutris-free
+    lutris-unwrapped
 #= OpenSource Minecraft Launcher
     glfw-wayland-minecraft
-    (prismlauncher.override { jdks = [ jdk19 jdk17 jdk8 jdk ]; })
-    jdk
+    (prismlauncher.override { jdks = [ jdk19 jdk17 jdk8 ]; })
     jdk8
     jdk17
     jdk19
@@ -816,12 +840,13 @@ in {
     airshipper 
   ];
 
+
 ##==> GAMING <==##
 
 #=> Gamescope
   programs.gamescope = {
     enable = true;
-    package = pkgs.gamescope;
+    package = unstable.pkgs.gamescope;
     capSysNice = false;
   };
 
@@ -833,13 +858,13 @@ in {
       general = {
         renice = 10;
       };
-    gpu = {
-      apply_gpu_optimisations = "accept-responsibility";
-      amd_performance_level = "high";
-    };
-    custom = {
-      start = "${pkgs.libnotify}/bin/notify-send 'GameMode Started'";
-      end = "${pkgs.libnotify}/bin/notify-send 'GameMode Ended'";
+      gpu = {
+        apply_gpu_optimisations = "accept-responsibility";
+        amd_performance_level = "high";
+      };
+      custom = {
+        start = "${pkgs.libnotify}/bin/notify-send 'GameMode Started'";
+        end = "${pkgs.libnotify}/bin/notify-send 'GameMode Ended'";
       };
     };
   };
@@ -867,14 +892,8 @@ in {
         pango
         lsof # friends options won't display "Launch Game" without it
         file # called by steam's setup.sh
-        # Vulkan
-        vulkan-tools
-        vulkan-loader
-        vulkan-headers
-        vulkan-tools-lunarg
-        vulkan-extension-layer
-        vk-bootstrap
         # Gamescope
+        gamescope
         xorg.libXcursor
         xorg.libXi
         xorg.libXinerama
@@ -895,7 +914,7 @@ in {
   hardware.opengl.driSupport = true; 
   hardware.opengl.driSupport32Bit = true;
   hardware.opengl.extraPackages = with pkgs; [
-    amdvlk
+    unstable.amdvlk
     unstable.libdrm
     mesa.drivers
     mesa.llvmPackages.llvm.lib
@@ -909,7 +928,7 @@ in {
     #intel-media-driver
   ]; 
   hardware.opengl.extraPackages32 = with pkgs.driversi686Linux; [
-    amdvlk
+    unstable.amdvlk
     mesa.drivers
     mesa.llvmPackages.llvm.lib
     glxinfo
@@ -920,6 +939,8 @@ in {
   ];
   hardware.opengl.setLdLibraryPath = true;
   hardware.steam-hardware.enable = true;
+  hardware.enableAllFirmware = true;
+  hardware.enableRedistributableFirmware = true; # Lemme update my CPU Microcode, alr?!
 
 #==> Environment Configs <==#
 
@@ -936,7 +957,7 @@ in {
         jack.periods = 2
       '';
     };
-    pathsToLink = [ "/share/X11" "/libexec" "/share/zsh" ]; # "/share/nix-ld"  
+    pathsToLink = [ "/share/X11" "/libexec" "/share/zsh" "/share/nix-ld" ];
     sessionVariables = rec {
 #=> Default's
       EDITOR = "nvim";
@@ -951,8 +972,6 @@ in {
       RADV_PERFTEST = "aco"; # Force aco
 #=> Steam
       STEAM_EXTRA_COMPAT_TOOLS_PATHS = "$HOME/.steam/root/compatibilitytools.d";
-#=> Load shared objects immediately for better first time latency...
-      LD_BIND_NOW = "1";
 #=> Wayland
       NIXOS_OZONE_WL = "1";
       OZONE_PLATFORM = "wayland";
@@ -966,7 +985,7 @@ in {
       PIPEWIRE_LATENCY = "256/48000 jack_simple_client";
 #=> QT
       QT_AUTO_SCREEN_SCALE_FACTOR = "1";
-      #QT_DEBUG_PLUGINS = "1";
+      QT_DEBUG_PLUGINS = "1";
       QT_QPA_PLATFORM = "wayland;xcb";
       QT_WAYLAND_DISABLE_WINDOWDECORATION = "1";
 #=> GTK
@@ -976,11 +995,9 @@ in {
       XCURSOR_SIZE = "16";
 #=> NIX
       NIXOS_XDG_OPEN_USE_PORTAL = "1";
-#=> PATH
-      PATH = [ "\${XDG_BIN_HOME}" ];
 #=> NIX-LD
-      #NIX_LD = "/run/current-system/sw/share/nix-ld/lib/ld.so";
-      #NIX_LD_LIBRARY_PATH = "/run/current-system/sw/share/nix-ld/lib";
+      NIX_LD = "/run/current-system/sw/share/nix-ld/lib/ld.so";
+      NIX_LD_LIBRARY_PATH = "/run/current-system/sw/share/nix-ld/lib";
 #=> Electron
       ELECTRON_SKIP_BINARY_DOWNLOAD = "1";
 #=> User Dirs
@@ -1014,22 +1031,23 @@ in {
     };
   };
 
+
 #=> Virtual Machines <=#
+
   virtualisation = {
     waydroid.enable = true; 
     libvirtd = {
       enable = true;
       qemu = {
         swtpm.enable = true;
-	ovmf.enable = true;
-	ovmf.packages = with pkgs; [ OVMFFull.fd ];
-	};
-      };
-      spiceUSBRedirection.enable = true;
+	    ovmf.enable = true;
+	  };
+    };
+    spiceUSBRedirection.enable = true;
   };
   services.spice-vdagentd.enable = true;
 
-#=> Drives
+#==> Drives
 
 #= Media Disk
   fileSystems."/mnt/sdb1" =
@@ -1050,21 +1068,31 @@ in {
       swapDevices = 2;
   };
 
-#=> Apparmor and polkit
-  security = {
-    apparmor = {
-      enable = true;
-      enableCache = true;
+#==> Polkit <==#
+
+  security.polkit.enable = true;
+
+  #= Polkit User Service
+  systemd.user.services.polkit-kde-authentication-agent-1 = {
+    enable = true;
+    description = "polkit-kde-authentication-agent-1";
+    wantedBy = [ "graphical-session.target" ];
+    wants = [ "graphical-session.target" ];
+    after = [ "graphical-session.target" ];
+    serviceConfig = {
+      Type = "simple";
+      ExecStart = "${pkgs.libsForQt5.polkit-kde-agent}/libexec/polkit-kde-authentication-agent-1";
+      Restart = "on-failure";
+      RestartSec = 1;
+      TimeoutStopSec = 10;
     };
   };
 
-#=> Network and Security
+#==> Network and Security <==#
+
   networking = {
     networkmanager.enable = true;
     hostName = "razor-crest"; # Define your hostname.
-    # networking.wireless.enable = true;
-    # proxy.default = "http://user:password@proxy:port/";
-    # proxy.noProxy = "127.0.0.1,localhost,internal.domain";
     firewall = {
       enable = true;
       allowedTCPPorts = [
@@ -1092,35 +1120,16 @@ in {
     bantime = "1h";
   };
 
-  # Configure network proxy if necessary
-  # networking.proxy.default = "http://user:password@proxy:port/";
-  # networking.proxy.noProxy = "127.0.0.1,localhost,internal.domain";
-
-  # Some programs need SUID wrappers, can be configured further or are
-  # started in user sessions.
-  # programs.mtr.enable = true;
-  # programs.gnupg.agent = {
-  #   enableSSHSupport = true;
-  # };
-
-  # List services that you want to enable:
-
-  # Enable the OpenSSH daemon.
-  # services.openssh.enable = true;
-
-  # Open ports in the firewall.
-  # networking.firewall.allowedTCPPorts = [ ... ];
-  # networking.firewall.allowedUDPPorts = [ ... ];
-  # Or disable the firewall altogether.
-  # networking.firewall.enable = false;
-
   # This value determines the NixOS release from which the default
   # settings for stateful data, like file locations and database versions
   # on your system were taken. It‘s perfectly fine and recommended to leave
   # this value at the release version of the first install of this system.
   # Before changing this value read the documentation for this option
   # (e.g. man configuration.nix or on https://nixos.org/nixos/options.html).
+  
   system.stateVersion = "23.11"; # Did you read the comment?
+  
+
   #system.copySystemConfiguration = true;
   #system.autoUpgrade.enable = true;
   #system.autoUpgrade.allowReboot = false;
