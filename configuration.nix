@@ -24,7 +24,7 @@ in {
   boot.loader.efi.canTouchEfiVariables = true;
   boot.plymouth.enable = true;
 #=> Kernel
-  boot.kernelPackages = unstable.pkgs.linuxPackages_zen; # Latest Kernel (ZEN).
+  boot.kernelPackages = pkgs.linuxPackages_latest; # Latest Kernel.
   boot.kernelParams = [
     "HDMI-A-1:1920x1080@60"
     "amdgpu.noretry=0"
@@ -123,7 +123,7 @@ in {
     qt.enable = true;
 
     # platform theme "gtk" or "gnome"
-    qt.platformTheme = "gtk";
+    qt.platformTheme = "gnome";
 
     # name of the qt theme
     qt.style.name = "adwaita-dark";
@@ -240,9 +240,8 @@ in {
   #services.xserver.displayManager.defaultSession = "plasmawayland";
 
 #= SDDM
-  services.xserver.displayManager.sddm.enable = true;
-  services.xserver.displayManager.sddm.wayland.enable = true;
-  services.xserver.displayManager.sddm.theme = "Elegant";
+  services.xserver.displayManager.gdm.enable = true;
+  services.xserver.displayManager.gdm.wayland = true;
 
 #= X.ORG/X11
   services.xserver = {
@@ -463,8 +462,8 @@ in {
     portalPackage = unstable.pkgs.xdg-desktop-portal-hyprland;
     enableNvidiaPatches = false; # false if you use a AMD GPU
     xwayland.enable = true;
-    #package = pkgs.hyprland;
-    package = hyprland-flake.packages.${pkgs.system}.hyprland;
+    package = unstable.pkgs.hyprland;
+    #package = hyprland-flake.packages.${pkgs.system}.hyprland;
   };
 #= Top Bar
   programs.waybar = {
@@ -494,20 +493,7 @@ in {
         libsForQt5.xdg-desktop-portal-kde
         lxqt.xdg-desktop-portal-lxqt
       ];
-      config = {
-        common = {
-          default = [ "xdph" "gtk" ];
-          "org.freedesktop.impl.portal.Secret" = [ "gnome-keyring" ];
-          "org.freedesktop.portal.FileChooser" = [ "xdg-desktop-portal-gtk" ];
-        };
-      };
     };
-    sounds.enable = true;
-    autostart.enable = true;
-    menus.enable = true;
-  # Many apps+DEs utilize MIME to represent types of files.
-  # Connections may be added by other Nix modules.
-    mime.enable = true;
   };
 
 #=> Appimages
@@ -537,6 +523,7 @@ in {
     };
   };
 
+
 #= Allow unfree packages
   nixpkgs.config.allowUnfree = true;
 
@@ -557,6 +544,7 @@ in {
     unstable.hyprland-per-window-layout
     unstable.hyprland-autoname-workspaces
     unstable.wayland-utils
+    unstable.hyprcursor # The hyprland cursor format, library and utilities
     # Wayland - Kiosk. Used for login_managers
     cage
     # Notification Deamon
@@ -590,13 +578,13 @@ in {
     adwaita-qt6
     qgnomeplatform-qt6
     qgnomeplatform
-    sddm-chili-theme # SDDM
-    unstable.elegant-sddm
     # XWayland/Wayland
     unstable.glfw-wayland
     unstable.xwayland
     unstable.xwaylandvideobridge
 #= Main
+    blender-hip
+    woeusb-ng
     alsa-plugins
     alsa-utils
     android-tools
@@ -606,6 +594,7 @@ in {
     webcord # discord client
     electron
     findutils
+    geogebra6
     godot_4
     libportal
     libsForQt5.qt5ct
@@ -615,11 +604,14 @@ in {
     pipewire
     protonup-qt
     python3
+    python311Packages.pipx
+    python311Packages.pip
     qt5.qtwayland
     qt6.qtwayland
     usbutils
     wget
     libreoffice # Office Suite
+    wpsoffice
     xboxdrv # Xbox Gamepad Driver
     #xclip
     yarn
@@ -642,8 +634,7 @@ in {
     rar
     unrar
 #= Torrent
-    frostwire-bin
-    rqbit
+    deluge
 #= Waydroid
     lzip
 #= electron based launchers need newer versions of these libraries than what runtime provides
@@ -763,13 +754,6 @@ in {
     unstable.vkdisplayinfo
     unstable.vkd3d-proton
     unstable.vk-bootstrap
-#= ROCm
-    rocmPackages.rocm-core
-    rocmPackages.rocm-runtime 
-    rocmPackages.clr
-    rocmPackages.rocm-smi # Managment interface
-    rocmPackages.rocminfo # ROCm app for reporting System info
-    rocmPackages.rocm-device-libs
 #= Administrative/GUI.
     corectrl # Let's you overclock/etc. Requires Polkit authentication!
 #= PC monitoring
@@ -795,10 +779,7 @@ in {
     vengi-tools
 #= Wine
     # support both 32- and 64-bit applications
-    (unstable.wineWowPackages.stagingFull.override {
-      mingwSupport = false;
-      vulkanSupport = true;
-    })
+    unstable.wineWowPackages.stagingFull
     samba
     # support 32-bit only
     #wine
@@ -843,6 +824,11 @@ in {
 
 ##==> GAMING <==##
 
+#= Ananicy
+  services.ananicy.enable = true;
+  services.ananicy.package = pkgs.ananicy-cpp;
+  services.ananicy.rulesProvider = pkgs.ananicy-rules-cachyos;
+
 #=> Gamescope
   programs.gamescope = {
     enable = true;
@@ -871,41 +857,8 @@ in {
 #=> Steam
   programs.steam = {
     enable = true;
-    remotePlay.openFirewall = false; # Open ports in the firewall for Steam Remote Play
+    remotePlay.openFirewall = true; # Open ports in the firewall for Steam Remote Play
     dedicatedServer.openFirewall = true; # Open ports in the firewall for Source Dedicated Server
-    package = pkgs.steam.override {
-      extraLibraries = p: with p; [
-        atk
-        dnsmasq
-        glxinfo
-        gtkmm2
-        gtkmm3
-        gtkmm4
-        libgdiplus
-        libxkbcommon
-        openal
-        xwayland
-        steamPackages.steam-runtime-wrapped
-        # steamwebhelper
-        harfbuzz
-        libthai
-        pango
-        lsof # friends options won't display "Launch Game" without it
-        file # called by steam's setup.sh
-        # Gamescope
-        gamescope
-        xorg.libXcursor
-        xorg.libXi
-        xorg.libXinerama
-        xorg.libXScrnSaver
-        libpng
-        libpulseaudio
-        libvorbis
-        stdenv.cc.cc.lib
-        libkrb5
-        keyutils
-      ];
-    };
   };
 
 #=> Vulkan, Codecs and more... 
@@ -918,8 +871,6 @@ in {
     unstable.libdrm
     mesa.drivers
     mesa.llvmPackages.llvm.lib
-    rocmPackages.clr
-    rocmPackages.clr.icd
     #vaapiIntel
     vaapiVdpau
     vdpauinfo
@@ -944,20 +895,8 @@ in {
 
 #==> Environment Configs <==#
 
-  environment = { 
-    etc = {
-#=> Pipewire
-    "pipewire/pipewire.conf.d/92-pipewire-config".text = ''
-        [pipewire]
-        realtime = true
-        support.dbus = true
-        cpu.zero.denormals = false
-        [alsa]
-        jack.period-size = 1024
-        jack.periods = 2
-      '';
-    };
-    pathsToLink = [ "/share/X11" "/libexec" "/share/zsh" "/share/nix-ld" ];
+  environment = {
+    pathsToLink = [ "/share/X11" "/libexec" "/share/nix-ld" ];
     sessionVariables = rec {
 #=> Default's
       EDITOR = "nvim";
@@ -967,22 +906,17 @@ in {
       MOZ_USE_XINPUT2 = "1";
 #=> JAVA
       _JAVA_AWT_WM_NONREPARENTING = "1";
-#=> RADV
-      AMD_VULKAN_ICD = "RADV"; # Force radv
-      RADV_PERFTEST = "aco"; # Force aco
 #=> Steam
       STEAM_EXTRA_COMPAT_TOOLS_PATHS = "$HOME/.steam/root/compatibilitytools.d";
 #=> Wayland
-      NIXOS_OZONE_WL = "1";
-      OZONE_PLATFORM = "wayland";
-      WLR_RENDERER = "vulkan";
-      WLR_NO_HARDWARE_CURSORS = "1";
+      #NIXOS_OZONE_WL = "1";
+      #OZONE_PLATFORM = "wayland";
+      #WLR_RENDERER = "vulkan";
+      #WLR_NO_HARDWARE_CURSORS = "1";
       MOZ_ENABLE_WAYLAND = "1";
-      SDL_VIDEODRIVER = "wayland";
+      #SDL_VIDEODRIVER = "wayland";
 #=> Flatpak
       FLATPAK_GL_DRIVERS = "mesa-git";
-#=> Pipewire
-      PIPEWIRE_LATENCY = "256/48000 jack_simple_client";
 #=> QT
       QT_AUTO_SCREEN_SCALE_FACTOR = "1";
       QT_DEBUG_PLUGINS = "1";
@@ -995,9 +929,6 @@ in {
       XCURSOR_SIZE = "16";
 #=> NIX
       NIXOS_XDG_OPEN_USE_PORTAL = "1";
-#=> NIX-LD
-      NIX_LD = "/run/current-system/sw/share/nix-ld/lib/ld.so";
-      NIX_LD_LIBRARY_PATH = "/run/current-system/sw/share/nix-ld/lib";
 #=> Electron
       ELECTRON_SKIP_BINARY_DOWNLOAD = "1";
 #=> User Dirs
