@@ -21,6 +21,7 @@ in {
 
 #=> Bootloader.
   boot.loader.systemd-boot.enable = true;
+  boot.loader.systemd-boot.consoleMode = "auto";
   boot.loader.efi.canTouchEfiVariables = true;
   boot.plymouth.enable = true;
 #=> Kernel
@@ -50,6 +51,11 @@ in {
     "tsc=reliable"
     "clocksource=tsc"
     "kcfi"
+    "fbcon=nodefer"
+    "vt.global_cursor_default=0"
+    "usbcore.autosuspend=-1"
+    "video4linux"
+    "acpi_rev_override=5"
   ];
 
   boot.kernel.sysctl = {
@@ -112,18 +118,24 @@ in {
     programs.home-manager.enable = true;
     home.username = "rick";
     home.homeDirectory = "/home/rick";
+    home.pointerCursor = {
+      gtk.enable = true;
+      package = pkgs.graphite-cursors;
+      name = "Graphite-dark-cursors";
+      size = 14;
+    };
 
-#= Dconf
-  dconf = {
-    enable = true;
-    settings."org/gnome/desktop/interface".color-scheme = "prefer-dark";
-  };
+  #= Dconf
+    dconf = {
+      enable = true;
+      settings."org/gnome/desktop/interface".color-scheme = "prefer-dark";
+    };
 
   #= QT
     qt.enable = true;
 
     # platform theme "gtk" or "gnome"
-    qt.platformTheme = "gnome";
+    qt.platformTheme = "gtk";
 
     # name of the qt theme
     qt.style.name = "adwaita-dark";
@@ -140,11 +152,11 @@ in {
   #= GTK
     gtk.enable = true;
 
-    gtk.cursorTheme.package = pkgs.gnome-themes-extra;
-    gtk.cursorTheme.name = "adwaita_cursor";
+    gtk.cursorTheme.package = pkgs.graphite-cursors;
+    gtk.cursorTheme.name = "Graphite-dark-cursors";
 
     gtk.theme.package = pkgs.adw-gtk3;
-    gtk.theme.name = "Adwaita-dark";
+    gtk.theme.name = "Adwaita-Dark";
 
     gtk.iconTheme.package = pkgs.papirus-icon-theme;
     gtk.iconTheme.name = "ePapirus-Dark";
@@ -278,13 +290,6 @@ in {
     packages = with pkgs; [ flatpak gcr gnome.gnome-settings-daemon ];
   };
 
-# Nautilus
-  services.gvfs.enable = true;
-  services.gvfs.package = pkgs.gnome.gvfs;
-  services.udisks2.enable = true;
-  services.devmon.enable = true;
-  services.gnome.gnome-settings-daemon.enable = true;
-
 #= Pipewire
 
   sound.enable = true;
@@ -297,8 +302,7 @@ in {
     pulse.enable = true;
     jack.enable = true;
     wireplumber.enable = true;
-    socketActivation = true;
-    package = pkgs.pipewire;
+    package = unstable.pkgs.pipewire;
   };
 
 #=> PROGRAMS <=#
@@ -416,8 +420,13 @@ in {
       ls = "eza --all --group-directories-first --grid --icons";
       tree = "eza -T --all --icons";
       ll = "eza -l --all --octal-permissions --icons";
+      cd = "z";
     };
-    interactiveShellInit = "fastfetch";
+    interactiveShellInit = "
+      fastfetch
+
+      zoxide init fish | source
+    ";
     vendor = {
       config.enable = true;
       completions.enable = true;
@@ -462,7 +471,7 @@ in {
     portalPackage = unstable.pkgs.xdg-desktop-portal-hyprland;
     enableNvidiaPatches = false; # false if you use a AMD GPU
     xwayland.enable = true;
-    package = unstable.pkgs.hyprland;
+    package = pkgs.hyprland;
     #package = hyprland-flake.packages.${pkgs.system}.hyprland;
   };
 #= Top Bar
@@ -545,6 +554,8 @@ in {
     unstable.hyprland-autoname-workspaces
     unstable.wayland-utils
     unstable.hyprcursor # The hyprland cursor format, library and utilities
+    unstable.hypridle
+    unstable.hyprlock
     # Wayland - Kiosk. Used for login_managers
     cage
     # Notification Deamon
@@ -563,6 +574,8 @@ in {
     swayidle # required by the screen locker
     #Clipboard-specific
     wl-clipboard
+    # An xrandr clone for wlroots compositors
+    wlr-randr
     # Screenshot
     unstable.grimblast # Taking
     unstable.slurp # Selcting
@@ -578,10 +591,11 @@ in {
     adwaita-qt6
     qgnomeplatform-qt6
     qgnomeplatform
+    tokyo-night-gtk
     # XWayland/Wayland
     unstable.glfw-wayland
     unstable.xwayland
-    unstable.xwaylandvideobridge
+    xwaylandvideobridge
 #= Main
     blender-hip
     woeusb-ng
@@ -617,9 +631,11 @@ in {
     yarn
 #= Cli Utilities
     babelfish
-    bat
+    unstable.bat
     dunst
     unstable.eza
+    unstable.zoxide
+    unstable.fzf
     git
     skim
 #= XDG
@@ -685,20 +701,16 @@ in {
     giada # Your hardcore loop machine.
     ardour # Multi-track hard disk recording software
     audacity
-    (wrapOBS {
-      plugins = with obs-studio-plugins; [ 
-        obs-vkcapture 
-        input-overlay 
+    (unstable.pkgs.wrapOBS {
+      plugins = with pkgs.obs-studio-plugins; [
+        wlrobs
+        obs-backgroundremoval
         obs-pipewire-audio-capture
-        wlrobs 
-        obs-move-transition 
-        waveform
-        obs-tuna
-        obs-backgroundremoval 
+        obs-vkcapture
+        obs-gstreamer
+        obs-vaapi
       ];
     })
-    obs-studio
-    obs-studio-plugins.obs-pipewire-audio-capture
 #= GStreamer and codecs
     # Video/Audio data composition framework tools like "gst-inspect", "gst-launch" ...
     gst_all_1.gstreamer
@@ -892,6 +904,7 @@ in {
   hardware.steam-hardware.enable = true;
   hardware.enableAllFirmware = true;
   hardware.enableRedistributableFirmware = true; # Lemme update my CPU Microcode, alr?!
+  hardware.pulseaudio.enable = false;
 
 #==> Environment Configs <==#
 
@@ -913,7 +926,7 @@ in {
       #OZONE_PLATFORM = "wayland";
       #WLR_RENDERER = "vulkan";
       #WLR_NO_HARDWARE_CURSORS = "1";
-      MOZ_ENABLE_WAYLAND = "1";
+      #MOZ_ENABLE_WAYLAND = "1";
       #SDL_VIDEODRIVER = "wayland";
 #=> Flatpak
       FLATPAK_GL_DRIVERS = "mesa-git";
@@ -1026,6 +1039,7 @@ in {
     hostName = "razor-crest"; # Define your hostname.
     firewall = {
       enable = true;
+      checkReversePath = true;
       allowedTCPPorts = [
         53
         80
