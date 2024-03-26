@@ -18,6 +18,7 @@ in {
 #=> Bootloader.
   boot.loader.systemd-boot.enable = true;
   boot.loader.efi.canTouchEfiVariables = true;
+  boot.loader.systemd-boot.consoleMode = "auto";
   boot.plymouth.enable = true;
 
 #=> Kernel
@@ -43,6 +44,16 @@ in {
     "mitigations=auto"
     "quiet"
     "splash"
+    "fbcon=nodefer"
+    "acpi_rev_override=5"
+    "tsc=reliable"
+    "clocksource=tsc"
+    "kcfi"
+    "fbcon=nodefer"
+    "vt.global_cursor_default=0"
+    "usbcore.autosuspend=-1"
+    "video4linux"
+    "acpi_rev_override=5"
   ];
   
   boot.kernel.sysctl = {
@@ -137,6 +148,29 @@ in {
     ];
   };
 
+  #= Cursor
+    home.pointerCursor = {
+      gtk.enable = true;
+      # x11.enable = true;
+      package = pkgs.bibata-cursors;
+      name = "Bibata-Modern-Classic";
+      size = 16;
+    };
+
+  #= GTK
+    gtk = {
+      enable = true;
+      theme = {
+        package =  pkgs.adw-gtk3;
+        name = "Adwaita-Dark";
+      };
+
+      iconTheme = {
+        package = pkgs.papirus-icon-theme;
+        name = "ePapirus-Dark";
+      };
+    };
+
   #= QT
     qt.enable = true;
 
@@ -154,20 +188,6 @@ in {
 
     # package to use
     qt.style.package = pkgs.adwaita-qt;
-
-  #= GTK
-
-    gtk.gtk3.extraConfig = {
-      Settings = ''
-        gtk-application-prefer-dark-theme=1
-      '';
-    };
-
-    gtk.gtk4.extraConfig = {
-      Settings = ''
-        gtk-application-prefer-dark-theme=1
-      '';
-    };
   };
 
   #= Define a user account. Don't forget to set a password with ‘passwd’.
@@ -198,8 +218,8 @@ in {
   #=> Fonts Config
   fonts = {
     packages = with pkgs; [
-      montserrat
       noto-fonts
+      montserrat
       (nerdfonts.override { fonts = [ "DaddyTimeMono" "Meslo" "JetBrainsMono" "UbuntuMono" ]; })
       source-han-sans
     ];
@@ -339,8 +359,7 @@ in {
     pulse.enable = true;
     jack.enable = true;
     wireplumber.enable = true;
-    socketActivation = true;
-    package = pkgs.pipewire;
+    package = unstable.pkgs.pipewire;
   };
    
 
@@ -496,6 +515,24 @@ in {
 #= XWayland
   programs.xwayland.enable = true;
 
+#==>~HYPRLAND~<==#
+
+  programs.hyprland = {
+    enable = true;
+    portalPackage = unstable.pkgs.xdg-desktop-portal-hyprland;
+    enableNvidiaPatches = false; # false if you use a AMD GPU
+    xwayland.enable = true;
+    package = pkgs.hyprland;
+  };
+
+#= Top Bar
+  programs.waybar = {
+    enable = true;
+    package = pkgs.waybar.overrideAttrs (oldAttrs: {
+      mesonFlags = oldAttrs.mesonFlags ++ [ "-Dexperimental=true" ];
+    });
+  };
+
 #= File Managers
   # Yazi
   programs.yazi = {
@@ -608,6 +645,62 @@ environment.systemPackages = with pkgs; [
     unstable.wayland-utils
     unstable.xwayland
     unstable.xwaylandvideobridge
+#= Hyprland
+     #=> Hyprland
+    # Terminal
+    unstable.kitty
+    # Top bar
+    #waybar
+    #waybar-mpris
+    # Main
+    #hyprland
+    unstable.hyprland-protocols
+    unstable.hyprland-per-window-layout
+    unstable.hyprland-autoname-workspaces
+    unstable.wayland-utils
+    unstable.hyprcursor # The hyprland cursor format, library and utilities
+    unstable.hypridle
+    unstable.hyprlock
+    # Wayland - Kiosk. Used for login_managers
+    cage
+    # Notification Deamon
+    dunst
+    libnotify
+    notify
+    # Wallpaper
+    unstable.hyprpaper
+    # App-Launcher
+    rofi-wayland
+    # Applets
+    networkmanagerapplet
+    # Screen-Locker
+    wlogout
+    # Idle manager
+    swayidle # required by the screen locker
+    #Clipboard-specific
+    wl-clipboard
+    # An xrandr clone for wlroots compositors
+    wlr-randr
+    # Screenshot
+    unstable.grimblast # Taking
+    unstable.slurp # Selcting
+    swappy # Editing
+#= Polkit
+    polkit
+    libsForQt5.polkit-kde-agent
+#= Filemanagers
+    gnome.nautilus
+    # Image Viewer
+    imv
+    # Theme's
+    adwaita-qt6
+    qgnomeplatform-qt6
+    qgnomeplatform
+    tokyo-night-gtk
+    # XWayland/Wayland
+    unstable.glfw-wayland
+    unstable.xwayland
+    xwaylandvideobridge
 #= Main
     alsa-plugins
     alsa-utils
@@ -620,7 +713,6 @@ environment.systemPackages = with pkgs; [
     libstdcxx5
     unstable.linuxHeaders
     python3
-    jetbrains.pycharm-professional # Pycharm
     qt5.qtwayland
     qt6.qtwayland
     sysprof
@@ -633,6 +725,8 @@ environment.systemPackages = with pkgs; [
     bat
     dunst
     unstable.eza
+    unstable.zoxide
+    unstable.fzf
     unstable.fastfetch
     unstable.kitty
     git
@@ -681,20 +775,16 @@ environment.systemPackages = with pkgs; [
 #= Video/Audio Tools
     olive-editor # Professional open-source NLE video editor
     giada # Your hardcore loop machine.
-    (wrapOBS {
-      plugins = with obs-studio-plugins; [ 
-        obs-vkcapture 
-        input-overlay 
+    (unstable.pkgs.wrapOBS {
+      plugins = with pkgs.obs-studio-plugins; [
+        wlrobs
+        obs-backgroundremoval
         obs-pipewire-audio-capture
-        wlrobs 
-        obs-move-transition 
-        waveform
-        obs-tuna
-        obs-backgroundremoval 
+        obs-vkcapture
+        obs-gstreamer
+        obs-vaapi
       ];
     })
-    obs-studio
-    obs-studio-plugins.obs-pipewire-audio-capture
 #= GStreamer and codecs
     # Video/Audio data composition framework tools like "gst-inspect", "gst-launch" ...
     gst_all_1.gstreamer
@@ -787,6 +877,11 @@ environment.systemPackages = with pkgs; [
 
 ##==> GAMING <==##
 
+#= Ananicy
+  services.ananicy.enable = true;
+  services.ananicy.package = pkgs.ananicy-cpp;
+  services.ananicy.rulesProvider = pkgs.ananicy-rules-cachyos;
+
 #=> Gamescope
   programs.gamescope = {
     enable = true;
@@ -810,8 +905,13 @@ environment.systemPackages = with pkgs; [
         park_cores = "no";
         pin_cores = "yes";
       };
+      custom = {
+        start = "${pkgs.libnotify}/bin/notify-send 'GameMode Started'";
+        end = "${pkgs.libnotify}/bin/notify-send 'GameMode Ended'";
+      };
     };
   };
+
 #=> Steam
   programs.steam = {
     enable = true;
@@ -871,12 +971,12 @@ environment.systemPackages = with pkgs; [
 #=> Steam
       STEAM_EXTRA_COMPAT_TOOLS_PATHS = "$HOME/.steam/root/compatibilitytools.d";
 #=> Wayland
-      #NIXOS_OZONE_WL = "1";
-      #OZONE_PLATFORM = "wayland";
-      #WLR_RENDERER = "vulkan";
-      #WLR_NO_HARDWARE_CURSORS = "1";
-      #MOZ_ENABLE_WAYLAND = "1";
-      #SDL_VIDEODRIVER = "wayland";
+      NIXOS_OZONE_WL = "1";
+      OZONE_PLATFORM = "wayland";
+      WLR_RENDERER = "vulkan";
+      WLR_NO_HARDWARE_CURSORS = "1";
+      MOZ_ENABLE_WAYLAND = "1";
+      SDL_VIDEODRIVER = "wayland";
 #=> Flatpak
       FLATPAK_GL_DRIVERS = "mesa-git";
     };
