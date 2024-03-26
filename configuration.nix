@@ -358,7 +358,7 @@ in {
       "network.cookie.cookieBehavior" = 1;
     };
     languagePacks = [ "es-MX" ];
-    package = pkgs.floorp;
+    package = pkgs.firefox;
   };
 
 #= Neovim
