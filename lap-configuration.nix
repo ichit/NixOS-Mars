@@ -21,29 +21,28 @@ in {
   boot.plymouth.enable = true;
 
 #=> Kernel
-  boot.kernelPackages = unstable.pkgs.linuxPackages_zen; # Latest Kernel (ZEN).
+  boot.kernelPackages = pkgs.linuxPackages_latest; # Latest Kernel
   boot.kernelParams = [
     "amdgpu.noretry=0"
     "amdgpu.dc=1"
     "amdgpu.dpm=1"
+    "amd_iommu=on"
+    "amdgpu.ppfeaturemask=1"
+    "amdgpu.exp_hw_support=1"
+    "rcu_nocbs=0-15"
     "amdgpu.sg_display=0"
     "amdgpu.vm_fragment_size=9"
     "radeon.si_support=0"
     "amdgpu.si_support=1"
     "radeon.cik_support=0"
     "amdgpu.cik_support=1"
+    "nvme_core.default_ps_max_latency_us=2000"
+    "nvme_core.io_timeout=500"
+    "nvme_core.use_host_mem=1"
     "transparent_hugepage=always"
-    "ksm=1"
     "mitigations=auto"
-    "nohibernate"
     "quiet"
     "splash"
-    "fbcon=nodefer"
-    "acpi_rev_override=5"
-    "tsc=reliable"
-    "clocksource=tsc"
-    "kcfi"
-    #"i915.force_probe=<device ID>"  $ nix-shell -p pciutils --run "lspci -nn | grep VGA"
   ];
   
   boot.kernel.sysctl = {
@@ -62,14 +61,10 @@ in {
   boot.initrd.kernelModules = [ "amdgpu" "radeon" "zenpower" "vmd" "xhci_pci" "ahci" "usbhid" "sd_mod" "mq-deadline" ]; # 
   boot.blacklistedKernelModules = [ "k10temp" ];
   boot.extraModulePackages = with config.boot.kernelPackages; [ 
-      zenpower 
+      zenpower
   ];
 
 #==> SystemD <==#
-
-  systemd.tmpfiles.rules = [
-      "L+    /opt/rocm/hip   -    -    -     -    ${pkgs.rocmPackages.clr}"
-    ];
 
   systemd.extraConfig = ''
       [Process]
@@ -109,7 +104,7 @@ in {
     home.username = "rick";
     home.homeDirectory = "/home/rick";
 
-#= Dconf
+#= Gnome Config
   dconf = {
     enable = true;
     settings."org/gnome/desktop/interface".color-scheme = "prefer-dark";
@@ -120,10 +115,18 @@ in {
     settings."org/gnome/mutter".center-new-windows = true;
     settings."org/gnome/desktop/interface".enable-hot-corners = false;
     settings."org/gnome/mutter".edge-tiling = true;
-    settings."org/gnome/desktop/session".idle-delay = "0";
+    settings."org/gnome/desktop/session".idle-delay = false;
     settings."org/gnome/desktop/peripherals/touchpad".disable-while-typing = false;
     settings."org/gnome/desktop/peripherals/touchpad".accel-profile = "flat";
-    settings."org/gnome/desktop/interface".mouse-emulation-mode = "area";
+    settings."org/gnome/desktop/peripherals/touchpad".click-method = "areas";
+    settings."org/gnome/desktop/peripherals/touchpad".edge-scrolling-enabled = false;
+    settings."org/gnome/desktop/peripherals/touchpad".tap-to-click = true;
+    settings."org/gnome/desktop/peripherals/touchpad".natural-scroll = false;
+    settings."org/gnome/desktop/peripherals/touchpad".two-finger-scrolling-enabled = true;
+    settings."org/gnome/desktop/interface".show-battery-percentage = true;
+    settings."org/gnome/settings-daemon/plugins/power".sleep-inactive-ac-type = "nothing";
+    settings."org/gnome/settings-daemon/plugins/power".sleep-inactive-battery-timeout = "nothing";
+    settings."org/gnome/settings-daemon/plugins/power".idle-dim = false;
     settings."org/gnome/desktop/search-providers".disabled = "['org.gnome.Software.desktop']";
     settings."org/gnome/shell".disable-user-extensions = false;
     settings."org/gnome/shell".enabled-extensions = [
@@ -233,33 +236,27 @@ in {
   services.tlp.enable = true;
   services.tlp.settings = {
     CPU_SCALING_GOVERNOR_ON_AC = "performance";
-    CPU_SCALING_GOVERNOR_ON_BAT = "ondemand";
+    CPU_SCALING_GOVERNOR_ON_BAT = "powersave";
 
     CPU_ENERGY_PERF_POLICY_ON_BAT = "power";
     CPU_ENERGY_PERF_POLICY_ON_AC = "performance";
 
-    PLATFORM_PROFILE_ON_AC = "performance";
-    PLATFORM_PROFILE_ON_BAT = "balanced";
+    CPU_DRIVER_OPMODE_ON_AC = "performance";
+    CPU_DRIVER_OPMODE_ON_BAT = "active";
 
     CPU_MIN_PERF_ON_AC = 0;
     CPU_MAX_PERF_ON_AC = 100;
     CPU_MIN_PERF_ON_BAT = 0;
     CPU_MAX_PERF_ON_BAT = 20;
+  };
+ services.power-profiles-daemon.enable = false;
 
-    CPU_BOOST_ON_AC = 1;
-    CPU_BOOST_ON_BAT = 0;
-
-    CPU_HWP_DYN_BOOST_ON_AC = 1;
-    CPU_HWP_DYN_BOOST_ON_BAT = 0;
-
-    #Optional helps save long term battery health
-    START_CHARGE_THRESH_BAT0 = 40; # 40 and bellow it starts to charge
-    STOP_CHARGE_THRESH_BAT0 = 95; # 80 and above it stops charging
-   };
-
-  services.power-profiles-daemon.enable = false;
 #= Thermal CPU Management
   services.thermald.enable = true;
+
+#= Chrony
+  services.chrony.enable = true;
+  services.chrony.package = unstable.pkgs.chrony;
 
 #= Enable Flatpak
   services.flatpak.enable = true;
@@ -457,7 +454,7 @@ in {
     shellAliases = {
       grep = "grep --color=auto";
       cat = "bat --style=plain --paging=never";
-      ls = "eza --all --group-directories-first --grid --icons";
+      ls = "eza --group-directories-first --grid --icons";
       tree = "eza -T --all --icons";
       ll = "eza -l --all --octal-permissions --icons";
     };
@@ -530,6 +527,63 @@ in {
     };
   };
 
+#= Run unpatched dynamic binaries on NixOS
+  programs.nix-ld.enable = true;
+  programs.nix-ld.package = unstable.pkgs.nix-ld;
+  programs.nix-ld.libraries = with pkgs; [
+    alsa-lib
+    at-spi2-atk
+    at-spi2-core
+    atk
+    cairo
+    cups
+    curl
+    dbus
+    expat
+    fontconfig
+    freetype
+    fuse3
+    gdk-pixbuf
+    glib
+    gtk3
+    icu
+    libGL
+    libappindicator-gtk3
+    libdrm
+    libglvnd
+    libnotify
+    libpulseaudio
+    libunwind
+    libusb1
+    libuuid
+    libxkbcommon
+    libxml2
+    mesa
+    nspr
+    nss
+    openssl
+    pango
+    pipewire
+    stdenv.cc.cc
+    systemd
+    vulkan-loader
+    xorg.libX11
+    xorg.libXScrnSaver
+    xorg.libXcomposite
+    xorg.libXcursor
+    xorg.libXdamage
+    xorg.libXext
+    xorg.libXfixes
+    xorg.libXi
+    xorg.libXrandr
+    xorg.libXrender
+    xorg.libXtst
+    xorg.libxcb
+    xorg.libxkbfile
+    xorg.libxshmfence
+    zlib
+  ];
+
 #= Allow unfree packages
   nixpkgs.config.allowUnfree = true;
 
@@ -543,55 +597,15 @@ environment.systemPackages = with pkgs; [
     gnomeExtensions.gamemode-indicator-in-system-settings
     gnomeExtensions.vitals
     gnome.gnome-tweaks
+    gnome.gnome-calculator
+    gnome.dconf-editor
     gnome.eog
     gnome.nautilus
-#=> Hyprland
-    # Terminal
-    unstable.kitty
-    # Top bar
-    #waybar
-    #waybar-mpris
-    # Main
-    #hyprland
-    unstable.hyprland-protocols
-    unstable.hyprland-per-window-layout
-    unstable.hyprland-autoname-workspaces
-    unstable.wayland-utils
-    # Wayland - Kiosk. Used for login_managers
-    cage
-    # Notification Deamon
-    dunst
-    libnotify
-    notify
-    # Wallpaper
-    unstable.hyprpaper
-    # App-Launcher
-    rofi-wayland
-    # Applets
-    networkmanagerapplet
-    # Screen-Locker
-    wlogout
-    # Idle manager
-    swayidle # required by the screen locker
     #Clipboard-specific
     wl-clipboard
-    # Screenshot
-    unstable.grimblast # Taking
-    unstable.slurp # Selcting
-    swappy # Editing
-#= Polkit
-    polkit
-    polkit_gnome
-    # Image Viewer
-    imv
-    # Theme's
-    adwaita-qt6
-    qgnomeplatform-qt6
-    qgnomeplatform
-    sddm-chili-theme # SDDM
-    unstable.elegant-sddm
     # XWayland/Wayland
     unstable.glfw-wayland
+    unstable.wayland-utils
     unstable.xwayland
     unstable.xwaylandvideobridge
 #= Main
@@ -736,13 +750,6 @@ environment.systemPackages = with pkgs; [
     unstable.vkdisplayinfo
     unstable.vkd3d-proton
     unstable.vk-bootstrap
-#= ROCm
-    rocmPackages.rocm-core
-    rocmPackages.rocm-runtime 
-    rocmPackages.clr
-    rocmPackages.rocm-smi # Managment interface
-    rocmPackages.rocminfo # ROCm app for reporting System info
-    rocmPackages.rocm-device-libs
 #= PC monitoring
     stacer # Linux System Optimizer and Monitoring.
     clinfo
@@ -756,10 +763,7 @@ environment.systemPackages = with pkgs; [
     vkbasalt
 #= Wine
     # support both 32- and 64-bit applications
-    (unstable.wineWowPackages.stagingFull.override {
-      mingwSupport = false;
-      vulkanSupport = true;
-    })
+    unstable.wineWowPackages.stagingFull
     samba
 #= The best Game in the World
     superTuxKart
@@ -802,9 +806,9 @@ environment.systemPackages = with pkgs; [
         apply_gpu_optimisations = "accept-responsibility";
         amd_performance_level = "high";
       };
-      custom = {
-        start = "${pkgs.libnotify}/bin/notify-send 'GameMode Started'";
-        end = "${pkgs.libnotify}/bin/notify-send 'GameMode Ended'";
+      cpu = {
+        park_cores = "no";
+        pin_cores = "yes";
       };
     };
   };
@@ -813,38 +817,6 @@ environment.systemPackages = with pkgs; [
     enable = true;
     remotePlay.openFirewall = false; # Open ports in the firewall for Steam Remote Play
     dedicatedServer.openFirewall = true; # Open ports in the firewall for Source Dedicated Server
-    package = pkgs.steam.override {
-      extraLibraries = p: with p; [
-        atk
-        dnsmasq
-        glxinfo
-        gtkmm2
-        gtkmm3
-        gtkmm4
-        libgdiplus
-        libxkbcommon
-        openal
-        xwayland
-        # steamwebhelper
-        harfbuzz
-        libthai
-        pango
-        lsof # friends options won't display "Launch Game" without it
-        file # called by steam's setup.sh
-        # Gamescope
-        gamescope
-        xorg.libXcursor
-        xorg.libXi
-        xorg.libXinerama
-        xorg.libXScrnSaver
-        libpng
-        libpulseaudio
-        libvorbis
-        stdenv.cc.cc.lib
-        libkrb5
-        keyutils
-      ];
-    };
   };
 
 #=> Vulkan, Codecs and more... 
@@ -857,8 +829,6 @@ environment.systemPackages = with pkgs; [
     unstable.libdrm
     mesa.drivers
     mesa.llvmPackages.llvm.lib
-    rocmPackages.clr
-    rocmPackages.clr.icd
     #vaapiIntel
     vaapiVdpau
     vdpauinfo
@@ -884,19 +854,7 @@ environment.systemPackages = with pkgs; [
 
 #==> Environment Configs <==#
 
-  environment = { 
-    etc = {
-#=> Pipewire
-    "pipewire/pipewire.conf.d/92-pipewire-config".text = ''
-        [pipewire]
-        realtime = true
-        support.dbus = true
-        cpu.zero.denormals = false
-        [alsa]
-        jack.period-size = 1024
-        jack.periods = 2
-      '';
-    };
+  environment = {
     pathsToLink = [ "/share/X11" "/libexec" "/share/nix-ld" ];
     sessionVariables = rec {
 #=> Default's
@@ -913,12 +871,12 @@ environment.systemPackages = with pkgs; [
 #=> Steam
       STEAM_EXTRA_COMPAT_TOOLS_PATHS = "$HOME/.steam/root/compatibilitytools.d";
 #=> Wayland
-      NIXOS_OZONE_WL = "1";
-      OZONE_PLATFORM = "wayland";
-      WLR_RENDERER = "vulkan";
-      WLR_NO_HARDWARE_CURSORS = "1";
-      MOZ_ENABLE_WAYLAND = "1";
-      SDL_VIDEODRIVER = "wayland";
+      #NIXOS_OZONE_WL = "1";
+      #OZONE_PLATFORM = "wayland";
+      #WLR_RENDERER = "vulkan";
+      #WLR_NO_HARDWARE_CURSORS = "1";
+      #MOZ_ENABLE_WAYLAND = "1";
+      #SDL_VIDEODRIVER = "wayland";
 #=> Flatpak
       FLATPAK_GL_DRIVERS = "mesa-git";
     };
@@ -973,19 +931,9 @@ environment.systemPackages = with pkgs; [
     enableIPv6 = false;
   };
 
-systemd.user.services.polkit-gnome-authentication-agent-1 = {
-      description = "polkit-gnome-authentication-agent-1";
-      wantedBy = ["graphical-session.target"];
-      wants = ["graphical-session.target"];
-      after = ["graphical-session.target"];
-      serviceConfig = {
-        Type = "simple";
-        ExecStart = "${pkgs.polkit_gnome}/libexec/polkit-gnome-authentication-agent-1";
-        Restart = "on-failure";
-        RestartSec = 1;
-        TimeoutStopSec = 10;
-    };
-  };
+#= Bluetooth
+  hardware.bluetooth.enable = true;
+  hardware.bluetooth.powerOnBoot = true;
 
 # Fail2Ban
   services.fail2ban = {
