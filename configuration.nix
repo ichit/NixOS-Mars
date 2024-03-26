@@ -2,15 +2,17 @@
 # your system.  Help is available in the configuration.nix(5) man page
 # and in the NixOS manual (accessible by running ‘nixos-help’).
 
-{ config, pkgs, lib, ... }: let
+{ 
+    config,
+    pkgs,
+    lib,
+    inputs,
+    ... 
+}: let
 
   home-manager = builtins.fetchTarball "https://github.com/nix-community/home-manager/archive/release-23.11.tar.gz";
 
   unstable = import (builtins.fetchTarball https://github.com/nixos/nixpkgs/tarball/nixos-unstable) { config = config.nixpkgs.config; };
-
-  flake-compat = builtins.fetchTarball "https://github.com/edolstra/flake-compat/archive/master.tar.gz";
-
-  hyprland-flake = (import flake-compat { src = builtins.fetchTarball "https://github.com/hyprwm/Hyprland/archive/master.tar.gz"; }).defaultNix;
 
 in {
   imports =
@@ -109,6 +111,7 @@ in {
     '';
 
 #==> User and Home Manager <==#
+
   home-manager.useUserPackages = true;
   home-manager.useGlobalPkgs = true;
   home-manager.extraSpecialArgs = {  };
@@ -118,12 +121,6 @@ in {
     programs.home-manager.enable = true;
     home.username = "rick";
     home.homeDirectory = "/home/rick";
-    home.pointerCursor = {
-      gtk.enable = true;
-      package = pkgs.graphite-cursors;
-      name = "Graphite-dark-cursors";
-      size = 14;
-    };
 
   #= Dconf
     dconf = {
@@ -149,17 +146,28 @@ in {
     # package to use
     qt.style.package = pkgs.adwaita-qt;
 
-  #= GTK
-    gtk.enable = true;
+    #= Cursor
+    home.pointerCursor = {
+      gtk.enable = true;
+      # x11.enable = true;
+      package = pkgs.bibata-cursors;
+      name = "Bibata-Modern-Classic";
+      size = 16;
+    };
+    
+    #= GTK
+    gtk = {
+      enable = true;
+      theme = {
+        package =  pkgs.adw-gtk3;
+        name = "Adwaita-Dark";
+      };
 
-    gtk.cursorTheme.package = pkgs.graphite-cursors;
-    gtk.cursorTheme.name = "Graphite-dark-cursors";
-
-    gtk.theme.package = pkgs.adw-gtk3;
-    gtk.theme.name = "Adwaita-Dark";
-
-    gtk.iconTheme.package = pkgs.papirus-icon-theme;
-    gtk.iconTheme.name = "ePapirus-Dark";
+      iconTheme = {
+        package = pkgs.papirus-icon-theme;
+        name = "ePapirus-Dark";
+      };
+    };
 
     gtk.gtk3.extraConfig = {
       Settings = ''
@@ -246,14 +254,16 @@ in {
 #= Enable Flatpak
   services.flatpak.enable = true;
 
-#= KDE Plasma
-  # Enable the KDE Plasma Desktop Environment.
-  #services.xserver.desktopManager.plasma5.enable = true;
-  #services.xserver.displayManager.defaultSession = "plasmawayland";
-
-#= SDDM
-  services.xserver.displayManager.gdm.enable = true;
-  services.xserver.displayManager.gdm.wayland = true;
+#= Greetd
+  services.greetd = {
+    enable = true;
+    settings = {
+      default_session = {
+        command = "${pkgs.greetd.tuigreet}/bin/tuigreet --time --cmd Hyprland";
+        user = "greeter";
+      };
+    };
+  };
 
 #= X.ORG/X11
   services.xserver = {
@@ -922,11 +932,11 @@ in {
 #=> Steam
       STEAM_EXTRA_COMPAT_TOOLS_PATHS = "$HOME/.steam/root/compatibilitytools.d";
 #=> Wayland
-      #NIXOS_OZONE_WL = "1";
-      #OZONE_PLATFORM = "wayland";
-      #WLR_RENDERER = "vulkan";
-      #WLR_NO_HARDWARE_CURSORS = "1";
-      #MOZ_ENABLE_WAYLAND = "1";
+      NIXOS_OZONE_WL = "1";
+      OZONE_PLATFORM = "wayland";
+      WLR_RENDERER = "vulkan";
+      WLR_NO_HARDWARE_CURSORS = "1";
+      MOZ_ENABLE_WAYLAND = "1";
       #SDL_VIDEODRIVER = "wayland";
 #=> Flatpak
       FLATPAK_GL_DRIVERS = "mesa-git";
