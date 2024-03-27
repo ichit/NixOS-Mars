@@ -2,7 +2,13 @@
 # your system.  Help is available in the configuration.nix(5) man page
 # and in the NixOS manual (accessible by running ‘nixos-help’).
 
-{ config, pkgs, lib, ... }: let
+{ 
+    config,
+    pkgs,
+    lib,
+    inputs,
+    ... 
+}: let
 
   home-manager = builtins.fetchTarball "https://github.com/nix-community/home-manager/archive/release-23.11.tar.gz";
 
@@ -302,8 +308,18 @@ in {
   services.gvfs.enable = true;
   services.sysprof.enable = true;
 
+#= Greetd
+  services.greetd = {
+    enable = true;
+    settings = {
+      default_session = {
+        command = "${pkgs.greetd.tuigreet}/bin/tuigreet --time --cmd Hyprland";
+        user = "greeter";
+      };
+    };
+  };
+
 #= Enable the GNOME Desktop Environment.
-  services.xserver.displayManager.gdm.enable = true;
   services.xserver.desktopManager.gnome.enable = true;
 
 #= X.ORG/X11
@@ -471,13 +487,19 @@ in {
     useBabelfish = true;
     promptInit = "set fish_greeting";
     shellAliases = {
-      grep = "grep --color=auto";
+      grep = "rg --color=auto";
       cat = "bat --style=plain --paging=never";
       ls = "eza --group-directories-first --grid --icons";
       tree = "eza -T --all --icons";
       ll = "eza -l --all --octal-permissions --icons";
+      search = "fzf";
+      cd = "z";
     };
-    interactiveShellInit = "fastfetch";
+    interactiveShellInit = "
+    fastfetch
+
+    zoxide init fish | source
+    ";
     vendor = {
       config.enable = true;
       completions.enable = true;
@@ -727,6 +749,7 @@ environment.systemPackages = with pkgs; [
     unstable.eza
     unstable.zoxide
     unstable.fzf
+    unstable.ripgrep
     unstable.fastfetch
     unstable.kitty
     git
@@ -774,7 +797,6 @@ environment.systemPackages = with pkgs; [
     gimp-with-plugins
 #= Video/Audio Tools
     olive-editor # Professional open-source NLE video editor
-    giada # Your hardcore loop machine.
     (unstable.pkgs.wrapOBS {
       plugins = with pkgs.obs-studio-plugins; [
         wlrobs
