@@ -722,7 +722,7 @@ environment.systemPackages = with pkgs; [
     # XWayland/Wayland
     unstable.glfw-wayland
     unstable.xwayland
-    xwaylandvideobridge
+    unstable.xwaylandvideobridge
 #= Main
     alsa-plugins
     alsa-utils
