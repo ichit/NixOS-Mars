@@ -358,7 +358,7 @@ in {
       "network.cookie.cookieBehavior" = 1;
     };
     languagePacks = [ "es-MX" ];
-    package = pkgs.firefox;
+    package = pkgs.wrapFirefox (pkgs.firefox-unwrapped.override { pipewireSupport = true;}) {};
   };
 
 #= Neovim
@@ -427,15 +427,12 @@ in {
     shellAliases = {
       grep = "grep --color=auto";
       cat = "bat --style=plain --paging=never";
-      ls = "eza --all --group-directories-first --grid --icons";
+      ls = "eza --group-directories-first --grid --icons";
       tree = "eza -T --all --icons";
       ll = "eza -l --all --octal-permissions --icons";
-      cd = "z";
     };
     interactiveShellInit = "
       fastfetch
-
-      zoxide init fish | source
     ";
     vendor = {
       config.enable = true;
@@ -546,17 +543,13 @@ in {
 #= Allow unfree packages
   nixpkgs.config.allowUnfree = true;
 
-#= Prismlauncher fetchTarball
-  #nixpkgs.overlays = [(import (builtins.fetchTarball "https://github.com/PrismLauncher/PrismLauncher/archive/develop.tar.gz")).overlays.default];
-
 #=> Packages Installed in System Profile.
   environment.systemPackages = with pkgs; [
     #=> Hyprland
     # Terminal
     unstable.kitty
     # Top bar
-    #waybar
-    #waybar-mpris
+    eww-wayland
     # Main
     #hyprland
     unstable.hyprland-protocols
@@ -614,6 +607,7 @@ in {
     android-tools
     android-udev-rules
     ark
+    brightnessctl
     clamtk # Antivirus
     webcord # discord client
     electron
@@ -633,8 +627,9 @@ in {
     qt5.qtwayland
     qt6.qtwayland
     usbutils
-    wget
+    jq
     libreoffice # Office Suite
+    wget
     wpsoffice
     xboxdrv # Xbox Gamepad Driver
     #xclip
