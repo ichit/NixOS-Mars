@@ -47,7 +47,7 @@ in {
     "nvme_core.io_timeout=500"
     "nvme_core.use_host_mem=1"
     "transparent_hugepage=always"
-    "mitigations=auto"
+    "mitigations=off"
     "quiet"
     "splash"
     "fbcon=nodefer"
@@ -64,12 +64,14 @@ in {
   
   boot.kernel.sysctl = {
     "vm.max_map_count" = 2147483642;  # A simple change Valve made on the Steam Deck...
-    "vm.swappiness" = 10;  # Reduce swappiness since RAM's faster.
+    "vm.swappiness" = 30;  # Reduce swappiness since RAM's faster.
+    "vm.vfs_cache_pressure" = 100;
     "vm.compaction_proactiveness" = 0;
     "vm.watermark_boost_factor" = 1;
     "vm.zone_reclaim_mode" = 0;
     "vm.page_lock_unfairness" = 1;
     "kernel.sysrq" = 1;
+    "kernel.split_lock_mitigate" = 0;
   };
 
   boot.tmp.cleanOnBoot = true;
@@ -308,19 +310,10 @@ in {
   services.gvfs.enable = true;
   services.sysprof.enable = true;
 
-#= Greetd
-  services.greetd = {
-    enable = true;
-    settings = {
-      default_session = {
-        command = "${pkgs.greetd.tuigreet}/bin/tuigreet --time --cmd Hyprland";
-        user = "greeter";
-      };
-    };
-  };
-
 #= Enable the GNOME Desktop Environment.
   services.xserver.desktopManager.gnome.enable = true;
+  services.xserver.displayManager.gdm.enable = true;
+  services.xserver.displayManager.gdm.wayland = true;
 
 #= X.ORG/X11
   services.xserver = {
