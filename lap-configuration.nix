@@ -30,60 +30,74 @@ in {
 #=> Kernel
   boot.kernelPackages = pkgs.linuxPackages_latest; # Latest Kernel
   boot.kernelParams = [
-    "amdgpu.noretry=0"
-    "amdgpu.dc=1"
-    "amdgpu.dpm=1"
-    "amd_iommu=on"
-    "amdgpu.ppfeaturemask=1"
-    "amdgpu.exp_hw_support=1"
-    "rcu_nocbs=0-15"
-    "amdgpu.sg_display=0"
-    "amdgpu.vm_fragment_size=9"
-    "radeon.si_support=0"
-    "amdgpu.si_support=1"
-    "radeon.cik_support=0"
-    "amdgpu.cik_support=1"
-    "nvme_core.default_ps_max_latency_us=2000"
-    "nvme_core.io_timeout=500"
-    "nvme_core.use_host_mem=1"
-    "transparent_hugepage=always"
-    "mitigations=off"
-    "quiet"
-    "splash"
-    "fbcon=nodefer"
-    "acpi_rev_override=5"
-    "tsc=reliable"
-    "clocksource=tsc"
-    "kcfi"
-    "fbcon=nodefer"
-    "vt.global_cursor_default=0"
-    "usbcore.autosuspend=-1"
-    "video4linux"
-    "acpi_rev_override=5"
+      "amdgpu.noretry=0"
+      "amd_iommu=on"
+      "amdgpu.dc=1"
+      "amdgpu.dpm=1"
+      "amdgpu.ppfeaturemask=1"
+      "amdgpu.exp_hw_support=1"
+      "nvme_core.default_ps_max_latency_us=2000"
+      "nvme_core.io_timeout=500"
+      "nvme_core.use_host_mem=1"
+      "mitigations=auto"
+      "rcu_nocbs=0-15"
+      "transparent_hugepage=always"
+      "mitigations=auto"
+      "quiet"
+      "splash"
+      "vt.global_cursor_default=0"
+      "usbcore.autosuspend=-1"
+      "video4linux"
+      "i8042.nopnp"
+      "acpi_backlight=native"
   ];
   
   boot.kernel.sysctl = {
     "vm.max_map_count" = 2147483642;  # A simple change Valve made on the Steam Deck...
     "vm.swappiness" = 30;  # Reduce swappiness since RAM's faster.
     "vm.vfs_cache_pressure" = 100;
+    "vm.overcommitMemory" = 0;
+    "vm.dirty_ratio" = 15;
+    "vm.dirty_background_ratio" = 10;
+    "vm.dirty_background_bytes" = 134127728;
+    "vm.dirty_writeback_centisecs" = 1500;
     "vm.compaction_proactiveness" = 0;
     "vm.watermark_boost_factor" = 1;
     "vm.zone_reclaim_mode" = 0;
     "vm.page_lock_unfairness" = 1;
+    "vm.page-cluster" = 0;
     "kernel.sysrq" = 1;
     "kernel.split_lock_mitigate" = 0;
+    "kernel.nmi_watchdog" = 0;
+    "kernel.unprivileged_userns_clone" = 1;
+    "net.core.somaxconn" = 8192;
+    "net.ipv4.tcp_fastopen" = 3;
+    "net.ipv4.tcp_congestion_control" = "bbr";
+    "net.ipv4.tcp_syncookies" = 1;
+    "net.ipv4.tcp_enc" = 1;
+    "net.ipv4.tcp_timestamps" = 0;
+    "net.core.netdev_max_backlog" = 16384;
+    "net.ipv4.tcp_slow_start_after_idle" = 0;
+    "net.ipv4.tcp_rfc1337" = 1;
+    "fs.inotify.max_user_watches" = 524288;
+    "fs.file-max" = 2097152;
   };
 
   boot.tmp.cleanOnBoot = true;
   boot.extraModprobeConfig = "options kvm_amd nested=1"; # AMD
   boot.supportedFilesystems = [ "ntfs" ];
-  boot.initrd.kernelModules = [ "amdgpu" "radeon" "zenpower" "vmd" "xhci_pci" "ahci" "usbhid" "sd_mod" "mq-deadline" ]; # 
-  boot.blacklistedKernelModules = [ "k10temp" ];
+  boot.initrd.kernelModules = [ "amdgpu" "radeon" "zenpower" "vmd" "xhci_pci" "ahci" "usbhid" "sd_mod" "mq-deadline" ];
+  boot.blacklistedKernelModules = [ "k10temp" "iTCO_wdt" "sp5100_tco" ];
   boot.extraModulePackages = with config.boot.kernelPackages; [ 
       zenpower
   ];
 
 #==> SystemD <==#
+
+  systemd.tmpfiles.rules = [
+      "L+    /usr/share/wayland-sessions/hyprland.desktop   -    -    -     -    ${pkgs.hyprland}/share/wayland-sessions/hyprland.desktop"
+      "L+    /opt/rocm/hip   -    -    -     -    ${pkgs.rocmPackages.clr}"
+  ];
 
   systemd.extraConfig = ''
       [Process]
@@ -107,55 +121,54 @@ in {
       ...
       DefaultLimitNOFILE=524288
     '';
-
   systemd.user.extraConfig = ''
       DefaultLimitNOFILE=524288
     '';
 
 #==> User and Home Manager <==#
+
   home-manager.useUserPackages = true;
   home-manager.useGlobalPkgs = true;
   home-manager.extraSpecialArgs = {  };
   home-manager.users.rick = {
     home.stateVersion = "23.11";
-  # Let Home Manager install and manage itself.
+    # Let Home Manager install and manage itself.
     programs.home-manager.enable = true;
     home.username = "rick";
     home.homeDirectory = "/home/rick";
 
-#= Gnome Config
-  dconf = {
-    enable = true;
-    settings."org/gnome/desktop/interface".color-scheme = "prefer-dark";
-    settings."org/gnome/desktop/interface".font-name = "Montserrat";
-    settings."org/gnome/desktop/wm/preferences".button-layout = ":minimize,maximize,close";
-    settings."org/gnome/desktop/interface".clock-format = "12h";
-    settings."org/gnome/desktop/interface".clock-show-date = false;
-    settings."org/gnome/mutter".center-new-windows = true;
-    settings."org/gnome/desktop/interface".enable-hot-corners = false;
-    settings."org/gnome/mutter".edge-tiling = true;
-    settings."org/gnome/desktop/session".idle-delay = false;
-    settings."org/gnome/desktop/peripherals/touchpad".disable-while-typing = false;
-    settings."org/gnome/desktop/peripherals/touchpad".accel-profile = "flat";
-    settings."org/gnome/desktop/peripherals/touchpad".click-method = "areas";
-    settings."org/gnome/desktop/peripherals/touchpad".edge-scrolling-enabled = false;
-    settings."org/gnome/desktop/peripherals/touchpad".tap-to-click = true;
-    settings."org/gnome/desktop/peripherals/touchpad".natural-scroll = false;
-    settings."org/gnome/desktop/peripherals/touchpad".two-finger-scrolling-enabled = true;
-    settings."org/gnome/desktop/interface".show-battery-percentage = true;
-    settings."org/gnome/settings-daemon/plugins/power".sleep-inactive-ac-type = "nothing";
-    settings."org/gnome/settings-daemon/plugins/power".sleep-inactive-battery-timeout = "nothing";
-    settings."org/gnome/settings-daemon/plugins/power".idle-dim = false;
-    settings."org/gnome/desktop/search-providers".disabled = "['org.gnome.Software.desktop']";
-    settings."org/gnome/shell".disable-user-extensions = false;
-    settings."org/gnome/shell".enabled-extensions = [
-      "appindicatorsupport@rgcjonas.gmail.com"
-      "blur-my-shell@aunetx"
-      "dash-to-dock@micxgx.gmail.com"
-      "gmind@tungstnballon.gitlab.com"
-    ];
-  };
-
+  #= Gnome Config
+    dconf = {
+      enable = true;
+      settings."org/gnome/desktop/interface".color-scheme = "prefer-dark";
+      settings."org/gnome/desktop/interface".font-name = "Montserrat";
+      settings."org/gnome/desktop/wm/preferences".button-layout = ":minimize,maximize,close";
+      settings."org/gnome/desktop/interface".clock-format = "12h";
+      settings."org/gnome/desktop/interface".clock-show-date = false;
+      settings."org/gnome/mutter".center-new-windows = true;
+      settings."org/gnome/desktop/interface".enable-hot-corners = false;
+      settings."org/gnome/mutter".edge-tiling = true;
+      settings."org/gnome/desktop/session".idle-delay = false;
+      settings."org/gnome/desktop/peripherals/touchpad".disable-while-typing = false;
+      settings."org/gnome/desktop/peripherals/touchpad".accel-profile = "flat";
+      settings."org/gnome/desktop/peripherals/touchpad".click-method = "areas";
+      settings."org/gnome/desktop/peripherals/touchpad".edge-scrolling-enabled = false;
+      settings."org/gnome/desktop/peripherals/touchpad".tap-to-click = true;
+      settings."org/gnome/desktop/peripherals/touchpad".natural-scroll = false;
+      settings."org/gnome/desktop/peripherals/touchpad".two-finger-scrolling-enabled = true;
+      settings."org/gnome/desktop/interface".show-battery-percentage = true;
+      settings."org/gnome/settings-daemon/plugins/power".sleep-inactive-ac-type = "nothing";
+      settings."org/gnome/settings-daemon/plugins/power".sleep-inactive-battery-timeout = "nothing";
+      settings."org/gnome/settings-daemon/plugins/power".idle-dim = false;
+      settings."org/gnome/desktop/search-providers".disabled = "['org.gnome.Software.desktop']";
+      settings."org/gnome/shell".disable-user-extensions = false;
+      settings."org/gnome/shell".enabled-extensions = [
+        "appindicatorsupport@rgcjonas.gmail.com"
+        "blur-my-shell@aunetx"
+        "dash-to-dock@micxgx.gmail.com"
+        "gmind@tungstnballon.gitlab.com"
+      ];
+    };
   #= Cursor
     home.pointerCursor = {
       gtk.enable = true;
@@ -164,40 +177,34 @@ in {
       name = "Bibata-Modern-Classic";
       size = 16;
     };
-
   #= GTK
     gtk = {
       enable = true;
       theme = {
-        package =  pkgs.adw-gtk3;
-        name = "Adwaita-Dark";
+        package = pkgs.material-black-colors;
+        name = "Material-Black-Blueberry";
       };
-
       iconTheme = {
         package = pkgs.papirus-icon-theme;
         name = "ePapirus-Dark";
       };
     };
-
   #= QT
     qt.enable = true;
-
     # platform theme "gtk" or "gnome"
     qt.platformTheme = "gnome";
-
     # name of the qt theme
     qt.style.name = "adwaita-dark";
-
     # detected automatically:
     # adwaita, adwaita-dark, adwaita-highcontrast,
     # adwaita-highcontrastinverse, breeze,
     # bb10bright, bb10dark, cde, cleanlooks,
     # gtk2, motif, plastique
-
     # package to use
     qt.style.package = pkgs.adwaita-qt;
   };
 
+#==> USER <==#
   #= Define a user account. Don't forget to set a password with ‘passwd’.
   users.users.rick = {
     isNormalUser = true;
@@ -222,7 +229,6 @@ in {
     shell = pkgs.fish; #pkgs.zsh;
     packages = with pkgs; [ ];
   };
-
   #=> Fonts Config
   fonts = {
     packages = with pkgs; [
@@ -230,6 +236,10 @@ in {
       montserrat
       (nerdfonts.override { fonts = [ "DaddyTimeMono" "Meslo" "JetBrainsMono" "UbuntuMono" ]; })
       source-han-sans
+      jost
+      material-design-icons
+      material-icons
+      material-symbols
     ];
     fontconfig = {
       enable = true;
@@ -260,84 +270,120 @@ in {
 
 #==> Services <==#
 
-#= Power Management
+ #= Power Management
   services.tlp.enable = true;
   services.tlp.settings = {
-    CPU_SCALING_GOVERNOR_ON_AC = "performance";
-    CPU_SCALING_GOVERNOR_ON_BAT = "powersave";
+        CPU_SCALING_GOVERNOR_ON_AC = "ondemand";
+        CPU_SCALING_GOVERNOR_ON_BAT = "schedutil";
 
-    CPU_ENERGY_PERF_POLICY_ON_BAT = "power";
-    CPU_ENERGY_PERF_POLICY_ON_AC = "performance";
+        CPU_ENERGY_PERF_POLICY_ON_BAT = "power";
+        CPU_ENERGY_PERF_POLICY_ON_AC = "performance";
 
-    CPU_DRIVER_OPMODE_ON_AC = "performance";
-    CPU_DRIVER_OPMODE_ON_BAT = "active";
+        CPU_DRIVER_OPMODE_ON_AC = "active";
+        CPU_DRIVER_OPMODE_ON_BAT = "guided";
 
-    CPU_MIN_PERF_ON_AC = 0;
-    CPU_MAX_PERF_ON_AC = 100;
-    CPU_MIN_PERF_ON_BAT = 0;
-    CPU_MAX_PERF_ON_BAT = 20;
-  };
- services.power-profiles-daemon.enable = false;
+        CPU_HWP_DYN_BOOST_ON_AC = 1;
+        CPU_HWP_DYN_BOOST_ON_BAT = 0;
 
-#= Thermal CPU Management
+        RADEON_DPM_STATE_ON_AC = "performance";
+        RADEON_DPM_STATE_ON_BAT = "battery";
+
+        RUNTIME_PM_ON_AC = "auto";
+        RUNTIME_PM_ON_BAT = "auto";
+
+        CPU_MIN_PERF_ON_AC = 0;
+        CPU_MAX_PERF_ON_AC = 100;
+        CPU_MIN_PERF_ON_BAT = 0;
+        CPU_MAX_PERF_ON_BAT = 30;
+
+        TLP_DEFAULT_MODE = "BAT";
+        TLP_PERSISTENT_DEFAULT = 1;
+    };
+
+ #= ACPID
+ services.acpid.enable = true;
+
+ #= Thermal CPU Management
   services.thermald.enable = true;
 
-#= Chrony
+ #= Chrony
   services.chrony.enable = true;
   services.chrony.package = unstable.pkgs.chrony;
 
-#= Enable Flatpak
+ #= Enable Flatpak
   services.flatpak.enable = true;
-
+  # Add Flathub repo
+  systemd.services.flatpak-repo = {
+    wantedBy = [ "multi-user.target" ];
+    path = [ pkgs.flatpak ];
+    script = ''
+      flatpak remote-add --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
+    '';
+  };
+ 
 
 ##==>> GNOME <<==## 
 
-  nixpkgs.overlays = [
-    (final: prev: {
-        gnome = prev.gnome.overrideScope' (gnomeFinal: gnomePrev: {
-            mutter = gnomePrev.mutter.overrideAttrs ( old: {
-                src = pkgs.fetchgit {
-                    url = "https://gitlab.gnome.org/vanvugt/mutter.git";
-                    # GNOME 45: Triple-Buffering-V4-45
-                    rev = "0b896518b2028d9c4d6ea44806d093fd33793689";
-                    sha256 = "sha256-mzNy5GPlB2qkI2KEAErJQzO//uo8yO0kPQUwvGDwR4w=";
-                };
-            });
-        });
-    })
-  ];
-  nixpkgs.config.allowAliases = false;
-  services.gvfs.enable = true;
-  services.sysprof.enable = true;
+  #nixpkgs.overlays = [
+  #  (final: prev: {
+  #      gnome = prev.gnome.overrideScope' (gnomeFinal: gnomePrev: {
+  #          mutter = gnomePrev.mutter.overrideAttrs ( old: {
+  #              src = pkgs.fetchgit {
+  #                  url = "https://gitlab.gnome.org/vanvugt/mutter.git";
+  #                  # GNOME 45: Triple-Buffering-V4-45
+  #                  rev = "0b896518b2028d9c4d6ea44806d093fd33793689";
+  #                  sha256 = "sha256-mzNy5GPlB2qkI2KEAErJQzO//uo8yO0kPQUwvGDwR4w=";
+  #              };
+  #          });
+  #      });
+  #  })
+  #];
 
-#= Enable the GNOME Desktop Environment.
-  services.xserver.desktopManager.gnome.enable = true;
-  services.xserver.displayManager.gdm.enable = true;
-  services.xserver.displayManager.gdm.wayland = true;
+  #= Enable the GNOME Desktop Environment.
+  #services.xserver.desktopManager.gnome.enable = true;
+  #services.xserver.displayManager.gdm.enable = true;
+  #services.xserver.displayManager.gdm.wayland = true;
 
-#= X.ORG/X11
+ #==> Greetd <==#
+  services.greetd = {
+    enable = true;
+    settings = {
+      default_session = {
+        command = "${pkgs.greetd.tuigreet}/bin/tuigreet --time --cmd Hyprland";
+        user = "greeter";
+      };
+    };
+  };
+
+  systemd.services.greetd.serviceConfig = {
+    Type = "idle";
+    StandardInput = "tty";
+    StandardOutput = "tty";
+    StandardError = "journal"; # Without this errors will spam on screen
+    # Without these bootlogs will spam on screen
+    TTYReset = true;
+    TTYVHangup = true;
+    TTYVTDisallocate = true;
+  };
+
+ #= X.ORG/X11
   services.xserver = {
     enable = true;
     updateDbusEnvironment = true;
     videoDrivers = [ "amdgpu" ];
     libinput = {
         enable = true;
-        touchpad = {
-            disableWhileTyping = false;
-            tapping = false;
-            dev = "/dev/input/platform-AMDI0010:00-event-mouse";
-        };
     };
-    layout = "es";
+    layout = "latam";
     xkbVariant = "nodeadkeys";
     excludePackages = [ pkgs.xterm ];
   };
 
-#= Configure console keymap
+ #= Configure console keymap
   console.keyMap = "es";
   console.packages = with pkgs; [ terminus-nerdfont ];
 
-#= Printers
+ #= Printers
   # Enable CUPS to print documents.
   services.printing.enable = true;
   services.printing.drivers = with pkgs; [
@@ -346,18 +392,18 @@ in {
     hplip
   ];
 
-#= FWUPD
+ #= FWUPD
   services.fwupd.enable = true;
 
-#= Dbus
+ #= Dbus
   services.dbus = {
     enable = true;
     apparmor = "enabled";
-    implementation = "broker"; 
-    packages = with pkgs; [ flatpak gcr gnome.gnome-settings-daemon ];
+    implementation = "dbus"; 
+    packages = with pkgs; [ flatpak firefox ];
   };
 
-#= Pipewire
+ #= Pipewire
   sound.enable = true;
   security.rtkit.enable = true; # Real-Time Priority to Processes.
   services.pipewire = {
@@ -368,13 +414,13 @@ in {
     pulse.enable = true;
     jack.enable = true;
     wireplumber.enable = true;
-    package = unstable.pkgs.pipewire;
+    package = pkgs.pipewire;
   };
    
 
 #=> PROGRAMS <=#
 
-#= Firefox
+ #= Firefox
   programs.firefox = {                  
     enable = true;
     preferences = {
@@ -415,10 +461,10 @@ in {
       "network.cookie.cookieBehavior" = 1;
     };
     languagePacks = [ "es-MX" ];
-    package = pkgs.firefox;
+    package = (pkgs.wrapFirefox (pkgs.firefox-unwrapped.override { pipewireSupport = true;}) {});
   };
 
-#= Neovim
+ #= Neovim
   programs.neovim = {
     enable = true;
     defaultEditor = true;
@@ -464,17 +510,16 @@ in {
     };
   };
 
-#= Java
+ #= Java
   programs.java = {
     enable = true;
     package = pkgs.jdk;
     binfmt = true;
   };
 
-#=> Shell's
+ #=> Shell's
 
-#= Fish
-
+  #= Fish
   programs.fish = {
     enable = true;
     useBabelfish = true;
@@ -486,12 +531,9 @@ in {
       tree = "eza -T --all --icons";
       ll = "eza -l --all --octal-permissions --icons";
       search = "fzf";
-      cd = "z";
     };
     interactiveShellInit = "
     fastfetch
-
-    zoxide init fish | source
     ";
     vendor = {
       config.enable = true;
@@ -501,7 +543,7 @@ in {
   };
   programs.nix-index.enableFishIntegration = true;
 
-#= Starship
+ #= Starship
   programs.starship.enable = true;
   programs.starship.settings = {
     add_newline = true;
@@ -527,7 +569,7 @@ in {
     package.disabled = true;
     };
 
-#= XWayland
+ #= XWayland
   programs.xwayland.enable = true;
 
 #==>~HYPRLAND~<==#
@@ -540,24 +582,43 @@ in {
     package = pkgs.hyprland;
   };
 
-#= Top Bar
+ #= Top Bar
   programs.waybar = {
     enable = true;
-    package = pkgs.waybar.overrideAttrs (oldAttrs: {
+    package = unstable.pkgs.waybar.overrideAttrs (oldAttrs: {
       mesonFlags = oldAttrs.mesonFlags ++ [ "-Dexperimental=true" ];
     });
   };
 
-#= File Managers
+ #= XDG
+  xdg = {
+    portal = {
+      enable = true;
+      extraPortals = with pkgs; [
+        xdg-desktop-portal-wlr
+        xdg-desktop-portal-gtk
+        libsForQt5.xdg-desktop-portal-kde
+        lxqt.xdg-desktop-portal-lxqt
+      ];
+    };
+  };
+
+ #= File Managers
   # Yazi
   programs.yazi = {
     enable = true;
-    package = unstable.pkgs.yazi;
+    package = pkgs.yazi;
   };
-  # Nautilus
-  services.gnome.sushi.enable = true;
+  # Thunar
+  programs.thunar.plugins = with pkgs.xfce; [
+    thunar-archive-plugin
+    thunar-volman
+  ];
+  programs.xfconf.enable = true;
+  services.gvfs.enable = true; # Mount, trash, and other functionalities
+  services.tumbler.enable = true; # Thumbnail support for images
 
-#=> Appimages
+ #=> Appimages
   boot.binfmt.registrations.appimage = {
     wrapInterpreterInShell = false;
     interpreter = "${pkgs.appimage-run}/bin/appimage-run";
@@ -569,7 +630,7 @@ in {
 
 #==> NIX/NIXPKGS <==#
 
-#= Enable Nix-Shell and Flakes
+ #= Enable Nix-Shell and Flakes
   nix = {
     settings = {
       warn-dirty = true;
@@ -579,7 +640,12 @@ in {
     };
   };
 
-#= Run unpatched dynamic binaries on NixOS
+  #= Permitted Insecure Packages
+  nixpkgs.config.permittedInsecurePackages = [
+    "electron-19.1.9"
+  ];
+
+ #= Run unpatched dynamic binaries on NixOS
   programs.nix-ld.enable = true;
   programs.nix-ld.package = unstable.pkgs.nix-ld;
   programs.nix-ld.libraries = with pkgs; [
@@ -636,22 +702,22 @@ in {
     zlib
   ];
 
-#= Allow unfree packages
+ #= Allow unfree packages
   nixpkgs.config.allowUnfree = true;
 
-#=> Packages Installed in System Profile.
-environment.systemPackages = with pkgs; [
-#= GNOME
-    gnome-extension-manager
-    gnomeExtensions.appindicator
-    gnomeExtensions.dash-to-dock
-    gnomeExtensions.blur-my-shell
-    gnomeExtensions.gamemode-indicator-in-system-settings
-    gnomeExtensions.vitals
-    gnome.gnome-tweaks
-    gnome.gnome-calculator
-    gnome.dconf-editor
-    gnome.eog
+ #=> Packages Installed in System Profile.
+ environment.systemPackages = with pkgs; [
+ #= Gnome
+    #gnome-extension-manager
+    #gnomeExtensions.appindicator
+    #gnomeExtensions.dash-to-dock
+    #gnomeExtensions.blur-my-shell
+    #gnomeExtensions.gamemode-indicator-in-system-settings
+    #gnomeExtensions.vitals
+    #gnome.gnome-tweaks
+    #gnome.gnome-calculator
+    #gnome.dconf-editor
+    #gnome.eog
     gnome.nautilus
     #Clipboard-specific
     wl-clipboard
@@ -660,13 +726,12 @@ environment.systemPackages = with pkgs; [
     unstable.wayland-utils
     unstable.xwayland
     unstable.xwaylandvideobridge
-#= Hyprland
+ #= Hyprland
      #=> Hyprland
     # Terminal
     unstable.kitty
     # Top bar
-    #waybar
-    #waybar-mpris
+    unstable.eww
     # Main
     #hyprland
     unstable.hyprland-protocols
@@ -692,19 +757,22 @@ environment.systemPackages = with pkgs; [
     wlogout
     # Idle manager
     swayidle # required by the screen locker
+    # Brightnes Manager
+    brightnessctl
+    # Media CMD Utility
+    playerctl
     #Clipboard-specific
     wl-clipboard
     # An xrandr clone for wlroots compositors
-    wlr-randr
+    #wlr-randr
     # Screenshot
     unstable.grimblast # Taking
     unstable.slurp # Selcting
     swappy # Editing
-#= Polkit
+  #= Polkit
     polkit
+    polkit_gnome
     libsForQt5.polkit-kde-agent
-#= Filemanagers
-    gnome.nautilus
     # Image Viewer
     imv
     # Theme's
@@ -715,18 +783,22 @@ environment.systemPackages = with pkgs; [
     # XWayland/Wayland
     unstable.glfw-wayland
     unstable.xwayland
-    unstable.xwaylandvideobridge
-#= Main
+    xwaylandvideobridge
+ #= Main
+    acpi
     alsa-plugins
     alsa-utils
+    appimage-run
     libsForQt5.ark
     clamtk
+    helvum
     webcord
     electron
+    jq
+    socat
     libportal
     libsForQt5.qt5ct
     libstdcxx5
-    unstable.linuxHeaders
     python3
     qt5.qtwayland
     qt6.qtwayland
@@ -735,60 +807,47 @@ environment.systemPackages = with pkgs; [
     wget
     libreoffice
     yarn
-#= Cli Utilities
+ #= Cli Utilities
     babelfish
     bat
     dunst
     unstable.eza
-    unstable.zoxide
     unstable.fzf
     unstable.ripgrep
     unstable.fastfetch
     unstable.kitty
     git
     skim
-#= Archives
+ #= Archives
+    imagemagick
     zip
     unzip
     gnutar
     rar
     unrar
-#= Torrent
-    frostwire-bin
-    rqbit
-#= Waydroid
-    lzip
-#= Rust
+ #= Rust
     cargo # PM for rust
     rustup # Rust toolchain installer
-#= Drives utilities
+ #= Drives utilities
     gnome.gnome-disk-utility # Disk Manager
     etcher # Flash OS images for Linux and another...
     woeusb # Flash OS images for Windows.
-#= Flatpak
+ #= Flatpak
     libportal
     libportal-qt5
     zip
-#= Graph manager dedicated for PipeWire
+ #= Graph manager dedicated for PipeWire
     pavucontrol # Pulseaudio Volume Control
-#= Appimages
+ #= Appimages
     appimagekit
     appimage-run
-#= TOR
+ #= TOR
     #obfs4
     #tor-browser
-#= Virtualization
-    virt-manager
-    virt-viewer
-    virtio-win
-    qemu_kvm
-    spice spice-gtk
-    spice-protocol
-    win-spice
-#= Image Editors
+ #= Image Editors
     krita
     gimp-with-plugins
-#= Video/Audio Tools
+ #= Video/Audio Tools
     olive-editor # Professional open-source NLE video editor
     (unstable.pkgs.wrapOBS {
       plugins = with pkgs.obs-studio-plugins; [
@@ -800,7 +859,7 @@ environment.systemPackages = with pkgs; [
         obs-vaapi
       ];
     })
-#= GStreamer and codecs
+ #= GStreamer and codecs
     # Video/Audio data composition framework tools like "gst-inspect", "gst-launch" ...
     gst_all_1.gstreamer
     gst_all_1.gstreamermm # C++ interface for GStreamer
@@ -841,11 +900,11 @@ environment.systemPackages = with pkgs; [
     ffmpeg
     ffmpeg-headless
     ffmpegthumbnailer
-#= Media Player
+ #= Media Player
     mpv
-#= AMD P-STATE EPP
+ #= AMD P-STATE EPP
     amdctl
-#= Vulkan
+ #= Vulkan
     unstable.vulkan-headers
     unstable.vulkan-loader
     unstable.vulkan-tools
@@ -855,7 +914,7 @@ environment.systemPackages = with pkgs; [
     unstable.vkdisplayinfo
     unstable.vkd3d-proton
     unstable.vk-bootstrap
-#= PC monitoring
+ #= PC monitoring
     stacer # Linux System Optimizer and Monitoring.
     clinfo
     glxinfo
@@ -866,29 +925,27 @@ environment.systemPackages = with pkgs; [
     goverlay
     mangohud
     vkbasalt
-#= Wine
+ #= Wine
     # support both 32- and 64-bit applications
     unstable.wineWowPackages.stagingFull
     samba
-#= The best Game in the World
+ #= The best Game in the World
     superTuxKart
-#= Steam Utils
+ #= Steam Utils
     winetricks
     protontricks
     protonup-qt
-#= Lutris
+ #= Lutris
     lutris-unwrapped
-#= OpenSource Minecraft Launcher
+ #= OpenSource Minecraft Launcher
     glfw-wayland-minecraft
     (prismlauncher.override { jdks = [ jdk19 jdk17 jdk8 ]; })
-#= Launcher for Veloren.
+ #= Launcher for Veloren.
     airshipper
   ];
 
-  nixpkgs.config.permittedInsecurePackages = [ "electron-19.1.9" ];
-
-#= Remove GNOME Bloatware
-  services.gnome.core-utilities.enable = false;
+  #= Remove GNOME Bloatware
+  #services.gnome.core-utilities.enable = false;
 
 ##==> GAMING <==##
 
@@ -940,26 +997,19 @@ environment.systemPackages = with pkgs; [
   hardware.opengl.driSupport = true; 
   hardware.opengl.driSupport32Bit = true;
   hardware.opengl.extraPackages = with pkgs; [
-    unstable.amdvlk
     unstable.libdrm
     mesa.drivers
-    mesa.llvmPackages.llvm.lib
-    #vaapiIntel
     vaapiVdpau
     vdpauinfo
     libvdpau
     libvdpau-va-gl
-    #intel-media-driver
   ]; 
   hardware.opengl.extraPackages32 = with pkgs.driversi686Linux; [
-    unstable.amdvlk
     mesa.drivers
-    mesa.llvmPackages.llvm.lib
     glxinfo
     vaapiVdpau
     vdpauinfo
     libvdpau-va-gl
-    #intel-media-driver
   ];
   hardware.opengl.setLdLibraryPath = true;
   hardware.steam-hardware.enable = true;
@@ -993,7 +1043,9 @@ environment.systemPackages = with pkgs; [
       MOZ_ENABLE_WAYLAND = "1";
       SDL_VIDEODRIVER = "wayland";
 #=> Flatpak
-      FLATPAK_GL_DRIVERS = "mesa-git";
+     FLATPAK_GL_DRIVERS = "mesa-git";
+#=> Polkit
+     POLKIT_BIN = "${pkgs.polkit_gnome}/libexec/polkit-gnome-authentication-agent-1";
     };
   };
 
@@ -1003,7 +1055,7 @@ environment.systemPackages = with pkgs; [
   programs.direnv = {
     enable = true;
     package = pkgs.direnv;
-    silent = false;
+    silent = true;
     loadInNixShell = true;
     direnvrcExtra = "";
     nix-direnv = {
@@ -1011,7 +1063,6 @@ environment.systemPackages = with pkgs; [
       package = pkgs.nix-direnv;
     };
   };
-
 
 #= Enable Trim Needed for SSD's
   services.fstrim.enable = true;
@@ -1046,10 +1097,6 @@ environment.systemPackages = with pkgs; [
     enableIPv6 = false;
   };
 
-#= Bluetooth
-  hardware.bluetooth.enable = true;
-  hardware.bluetooth.powerOnBoot = true;
-
 # Fail2Ban
   services.fail2ban = {
     enable = true;
@@ -1060,8 +1107,40 @@ environment.systemPackages = with pkgs; [
       "2620:fe::fe:11"
     ];
     maxretry = 5;
-    bantime = "1h";
+    bantime = "12h";
   };
+
+  systemd.user.services.polkit-gnome-authentication-agent-1 = {
+    description = "polkit-gnome-authentication-agent-1";
+    wantedBy = [ "graphical-session.target" ];
+    wants = [ "graphical-session.target" ];
+    after = [ "graphical-session.target" ];
+    serviceConfig = {
+        Type = "simple";
+        ExecStart = "${pkgs.polkit_gnome}/libexec/polkit-gnome-authentication-agent-1";
+        Restart = "on-failure";
+        RestartSec = 1;
+        TimeoutStopSec = 10;
+      };
+  };
+
+  security.polkit.enable = true;
+  security.polkit.extraConfig = ''
+    polkit.addRule(function(action, subject) {
+      if (
+        subject.isInGroup("users")
+          && (
+            action.id == "org.freedesktop.login1.reboot" ||
+            action.id == "org.freedesktop.login1.reboot-multiple-sessions" ||
+            action.id == "org.freedesktop.login1.power-off" ||
+            action.id == "org.freedesktop.login1.power-off-multiple-sessions"
+          )
+        )
+      {
+        return polkit.Result.YES;
+      }
+    })
+  '';
 
   # This value determines the NixOS release from which the default
   # settings for stateful data, like file locations and database versions
